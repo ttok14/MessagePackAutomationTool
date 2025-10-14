@@ -1,0 +1,4 @@
+EnumName,IsFlags,MemberName,Value,Description
+E_ItemType,False,None,0,없음
+E_ItemType,False,Default,1,일반 아이템
+E_ItemType,False,Weapon,2,무기 아이템

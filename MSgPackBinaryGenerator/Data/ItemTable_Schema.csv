@@ -1,0 +1,5 @@
+Key,Type
+ID,uint
+ItemType,eItemType
+NameKey,string
+Price,uint
