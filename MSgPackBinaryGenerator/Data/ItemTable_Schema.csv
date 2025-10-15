@@ -1,5 +1,5 @@
 Key,Type
 ID,uint
-ItemType,eItemType
+ItemType,E_ItemType
 NameKey,string
 Price,uint
