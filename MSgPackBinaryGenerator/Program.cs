@@ -1,15 +1,10 @@
 ﻿using MessagePack;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CSharp;
+using MessagePack.Resolvers;
 using System;
-using System.CodeDom;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Numerics;
 using System.Reflection;
-using System.Runtime.InteropServices;
 
 namespace MSgPackBinaryGenerator
 {
@@ -19,9 +14,6 @@ namespace MSgPackBinaryGenerator
         {
             var itemTableCsv = File.ReadAllLines(@"C:\Users\LeeYunSeon\source\repos\MSgPackBinaryGenerator\MSgPackBinaryGenerator\Data\ItemTable.csv");
             var itemTableSchemaCsv = File.ReadAllLines(@"C:\Users\LeeYunSeon\source\repos\MSgPackBinaryGenerator\MSgPackBinaryGenerator\Data\ItemTable_Schema.csv");
-
-            //Console.WriteLine(itemTableCsv);
-            //Console.WriteLine(itemTableSchemaCsv);
 
             string itemTableTypes = "";
             string[] itemDataTableColumns = itemTableCsv[0].Split(',');
@@ -42,27 +34,16 @@ namespace MSgPackBinaryGenerator
 
             itemTableTypes = itemTableTypes.Trim(',');
 
-            //Console.WriteLine(itemTableCsv[0]);
-            //Console.WriteLine(itemTableTypes);
-            var generator = new DBContainerGenerator();
-
             var classDefinitions = new List<TableSchemaDefinition>();
             var itemTableDef = new TableSchemaDefinition("ItemTable", itemTableCsv[0], itemTableTypes);
             classDefinitions.Add(itemTableDef);
 
-            var dbContainerSourceCode = generator.Generate(new List<TableSchemaDefinition>() { itemTableDef });
-            //Console.WriteLine(dbContainerSourceCode);
-            //Console.WriteLine(dbContainerSourceCode);
-
-            // 데이터 
             var itemTableCsvList = itemTableCsv.ToList();
             itemTableCsvList.RemoveAt(0);
             string[] itemDataRaws = itemTableCsvList.ToArray();
 
 
             var itemTableDataGroup = new TableDataDefinition(itemDataTableColumns, itemDataRaws, itemTableDef);
-
-            //-------------------------------------//
 
             var enumCsv = File.ReadAllLines(@"C:\Users\LeeYunSeon\source\repos\MSgPackBinaryGenerator\MSgPackBinaryGenerator\Data\EnumTable.csv");
             var raws = enumCsv.ToList();
@@ -72,34 +53,18 @@ namespace MSgPackBinaryGenerator
             var enumGenerator = new DBEnumContainer();
             var enumSourceCode = enumGenerator.Generate(enumGroup);
             Console.WriteLine(enumSourceCode);
-            //Console.WriteLine(enumSourceCode.ToString());
 
-            //Console.WriteLine(dbContainerSourceCode);
-            //Console.WriteLine(enumSourceCode);
-
-            //------------------------------//
-            //Console.WriteLine(dbContainerSourceCode);
-            //CompileSource(dbContainerSourceCode);
-            // CompileSource(enumSourceCode);
-
-            //---------------------------------------//
-
-            //----------------------------------------//
+            var generator = new DBContainerGenerator();
+            var dbContainerSourceCode = generator.Generate(new List<TableSchemaDefinition>() { itemTableDef }, enumGroup, includeUnitySupport: true);
 
             Console.WriteLine("--------------------------------------------------");
             var binaryExporter = new BinaryExporterGeneratorGenerator();
             var itemTableContainer = new TableContainer(classDefinitions[0], itemTableDataGroup);
             var tableContainer = new List<TableContainer>() { itemTableContainer };
             var binaryGeneratorSourceCode = binaryExporter.Generate(tableContainer, enumGroup);
-            //  Console.WriteLine(binaryGeneratorSourceCode);
-
-            // RuntimeCompiler.CompileSource(binaryGeneratorSourceCode);
 
             var mpcInputGenerator = new MpcInputGenerator();
             var mpcInputSourceCode = mpcInputGenerator.Generate(tableContainer, enumGroup);
-
-            // Console.WriteLine(mpcInputSourceCode);
-            // RuntimeCompiler.CompileSourceToDll(mpcInputSourceCode, $@"{Directory.GetCurrentDirectory()}/.dll");
 
             StartPipeline(
                 Directory.GetCurrentDirectory(),
@@ -128,8 +93,11 @@ namespace MSgPackBinaryGenerator
 
             //Console.WriteLine($"Saved source code to: {srcPath}");
 
+            string mpcInputProjectName = "MpcInputProject";
+            string gameDBResolverName = "GameDBResolver";
+
             // mpc 가 resolver 를 만들때 필요한 .csproj 및 dll 을 생성
-            string inputProjectForMpc = CsprojGenerator.GenerateProject(outputDirectory, "MpcInputProject");
+            string inputProjectForMpc = CsprojGenerator.GenerateProject(outputDirectory, mpcInputProjectName);
             // 여기서 이제 .csproj를 보고 컴파일을해 어셈블리를 생성 
             // ** 이때 , 중요한거는 .NET SDK 버전 이후로 (이전에는 non-sdk, e.g .Net Framework)
             // .csproj 를 빌드할때는 .csproj 에 직접 <Compile Include="ItemTable.cs" />.. 이런식으로
@@ -141,7 +109,7 @@ namespace MSgPackBinaryGenerator
             Console.WriteLine("-------------------------");
 
             // Resolver 생성 
-            string resolveOutput = Path.Combine(outputDirectory, "GameDBResolver.cs");
+            string resolveOutput = Path.Combine(outputDirectory, $"{gameDBResolverName}.cs");
 
             // mpc 도 내부적으로 MSBuild 로 빌드를 하기 때문에 
             // 이 시점 이전에 의도치않은 .cs 파일 생성은 주의해야함 (e.g GameDBContainer.cs)
@@ -160,9 +128,9 @@ namespace MSgPackBinaryGenerator
             // 을 사용하기 때문에 inputDll 을 넣어줘야 resolverDll 컴파일 가능.
             var resolverAssembly = RuntimeCompiler.CompileSourceToDll(
                 resolverSourceCode,
-                new string[] { inputDllForMpc },
+                new[] { inputDllForMpc },
                 outputDirectory,
-                "GameDBResolver.dll"
+                $"{gameDBResolverName}.dll"
             );
 
             var currentDllPath = Assembly.GetExecutingAssembly().Location;
@@ -175,8 +143,11 @@ namespace MSgPackBinaryGenerator
                 binaryGeneratorSourceCode,
                 new string[]
                 {
-                    /* inputDllForMpc,*/ 
+                    // 클래스/Enum 들 참조
+                    inputDllForMpc,
+                    // Serialize 할때 Resolver 참조
                     resolverAssembly.Location,
+                    // 향후 확장성 고려해서 일단 지금 어셈도 추가
                     currentDllPath
                 });
 
@@ -187,8 +158,7 @@ namespace MSgPackBinaryGenerator
                 return;
             }
 
-            // ExportItemTable 메서드를 찾아서 호출
-            var method = type.GetMethod("ExportItemTable", BindingFlags.Public | BindingFlags.Static);
+            var method = type.GetMethod("ExportItemTable", BindingFlags.Public | BindingFlags.Static, null, new[] { typeof(string), typeof(MessagePackSerializerOptions) }, null);
             if (method == null)
             {
                 Console.WriteLine("❌ ExportItemTable 메서드를 찾을 수 없습니다.");
@@ -199,33 +169,64 @@ namespace MSgPackBinaryGenerator
                 Console.WriteLine("Method Found : " + method.Name);
             }
 
-            Console.WriteLine(Directory.GetCurrentDirectory());
-            string outputPath = Path.Combine(Directory.GetCurrentDirectory(), "pipeline", "ItemTable.bytes");
+            var assemblyPaths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                { mpcInputProjectName, inputDllForMpc },
+                { gameDBResolverName, resolverAssembly.Location }
+            };
 
-            #region ===:: 실제 Binary 파일 조립 ::====
-            Assembly.LoadFrom(inputDllForMpc);
-            method.Invoke(null, new object[] { outputPath });
-            #endregion
+            // 만약 다른 어셈블리가 참조하려는 어셈블리가 존재하지 않는다면 
+            // 최종적으로 오류를 발생시키기 전 이 이벤트 콜백이 호출됨.
+            // 이 상황을 대비해서 여기에 연결해놓고 만약 런타임에 어셈블리가
+            // 요청되면 여기서 현재 실행 어셈블리에 로드하는 방식으로 대응
+            ResolveEventHandler assemblyResolver = (sender, args) =>
+            {
+                string assemblyName = new AssemblyName(args.Name).Name;
+                if (assemblyPaths.TryGetValue(assemblyName, out string path))
+                {
+                    return Assembly.LoadFrom(path);
+                }
+                return null;
+            };
+
+            AppDomain.CurrentDomain.AssemblyResolve += assemblyResolver;
+
+            try
+            {
+                // 1. GameDBResolver.Instance를 리플렉션으로 가져옵니다.
+                var gameDBResolverType = resolverAssembly.GetType("GameDB.Resolvers.GameDBContainerResolver");
+                var gameDBResolverInstance = (IFormatterResolver)gameDBResolverType.GetField("Instance").GetValue(null);
+
+                // 2. 각 리졸버를 LoggingResolver로 감싸서 디버깅 로그를 출력하도록 합니다.
+                var loggingGameDBResolver = new LoggingResolver(gameDBResolverInstance, "GameDBResolver");
+                var loggingStandardResolver = new LoggingResolver(StandardResolver.Instance, "StandardResolver");
+
+                // 3. 로그를 출력하는 리졸버들을 조합합니다.
+                var resolver = CompositeResolver.Create(
+                    loggingGameDBResolver,
+                    loggingStandardResolver
+                );
+
+                // 4. 이 리졸버를 포함하는 새로운 옵션 객체를 만듭니다.
+                var options = MessagePackSerializerOptions.Standard.WithResolver(resolver);
+
+                // 5. 생성된 옵션을 메서드에 파라미터로 전달합니다.
+                string binaryOutputPath = Path.Combine(outputDirectory, "ItemTable.bytes");
+
+                Console.WriteLine("\n--- Starting Serialization ---\n");
+                method.Invoke(null, new object[] { binaryOutputPath, options });
+                Console.WriteLine("\n--- Serialization Finished ---\n");
+                // ========================= ▲▲▲ 추가된 부분 2 ▲▲▲ =========================
+            }
+            finally
+            {
+                AppDomain.CurrentDomain.AssemblyResolve -= assemblyResolver;
+            }
 
             #region ===:: Binary 생성에 필요하지 않은 파일들은 안전하게 마지막에 생성 (의도치 않은 빌드에 포함 방지)::===
             File.WriteAllText(Path.Combine(outputDirectory, "GameDBContainer.cs"), dbContainerSourceCode);
+            File.WriteAllText(Path.Combine(outputDirectory, "BinaryExporter.cs"), binaryGeneratorSourceCode);
             #endregion
-
-            //------- 빌드 결과에 필요없는 중간 생성 파일 전부 삭제 ------//
-            string[] fileCleanList = { "MpcInputProject.csproj", "MpcInput.cs" };
-            foreach (var name in fileCleanList)
-            {
-                string fullPath = Path.Combine(outputDirectory, name);
-                if (File.Exists(fullPath)) // 파일이 존재하는지 확인 후 삭제
-                {
-                    Console.WriteLine($"Deleting File : {fullPath}");
-                    File.Delete(fullPath);
-                }
-            }
-
-            // 직접 삭제해야할 리스트 (어셈블리 언로드 불가능하기 때문에 런타임에 삭제 못함. 파일락)
-            /// - GameDBResolver.dll
-            /// - bin / obj 폴더 
         }
     }
 }

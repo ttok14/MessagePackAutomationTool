@@ -20,41 +20,17 @@ namespace MSgPackBinaryGenerator
             _builder.AppendLine("using System.IO;");
             _builder.AppendLine("using MessagePack;");
             _builder.AppendLine("using MessagePack.Resolvers;");
+            _builder.AppendLine("using System.Buffers;");
             _builder.AppendLine();
             _builder.AppendLine("namespace GameDB");
             _builder.OpenBracket();
             {
-                _builder.AppendLine(enumGroup.ToSourceCode(EnumGroupsSourceCodeForm.Groups));
-
-                foreach (var container in tableContainer)
-                {
-                    _builder.AppendLine();
-                    _builder.AppendLine(container.SchemaData.ToSourceCode(DataTableSourceCodeForm.DeclarationOnlyFields));
-                    _builder.AppendLine();
-                }
-
                 _builder.AppendLine("public static class TableBinaryExporter");
                 _builder.OpenBracket();
                 {
-                    _builder.AppendLine($"static TableBinaryExporter()");
-                    _builder.OpenBracket();
-                    {
-                        _builder.AppendLine("MessagePack.Resolvers.MyCompositeResolver.Instance.Register(");
-                        _builder.AppendLine("\tGameDB.Resolvers.GameDBContainerResolver.Instance,");
-                        _builder.AppendLine("\tStandardResolver.Instance");
-                        _builder.AppendLine(");");
-                        _builder.AppendLine();
-                        _builder.AppendLine("MessagePackSerializer.DefaultOptions =");
-                        _builder.AppendLine("\tMessagePackSerializer.DefaultOptions.WithResolver(");
-                        _builder.AppendLine("\t\tMessagePack.Resolvers.MyCompositeResolver.Instance");
-                        _builder.AppendLine("\t);");
-                        _builder.AppendLine("");
-                    }
-                    _builder.CloseBracket();
-
                     foreach (var container in tableContainer)
                     {
-                        _builder.AppendLine($"public static void Export{container.SchemaData.TableName}(string outputPath)");
+                        _builder.AppendLine($"public static void Export{container.SchemaData.TableName}(string outputPath, MessagePackSerializerOptions options)");
                         _builder.OpenBracket();
                         {
                             _builder.AppendLine($"var dic = new Dictionary<{container.SchemaData.IDType}, {container.SchemaData.TableName}>");
@@ -86,17 +62,30 @@ namespace MSgPackBinaryGenerator
                                         _builder.Append($"{record.SchemaData.Name} = {value},");
                                     }
 
-                                    // 하나 element 할당 후 닫는 부분
                                     _builder.Append($"}},");
                                     _builder.AppendLine();
                                 }
                             }
                             _builder.CloseBracket(true);
 
-                            _builder.AppendLine($"byte[] bytes = MessagePackSerializer.Serialize(dic);");
-                            _builder.AppendLine($"File.WriteAllBytes(outputPath, bytes);");
-                            _builder.AppendLine();
-                            // _builder.AppendLine("✅ Export complete: {outputPath}");
+                            _builder.AppendLine("var bufferWriter = new ArrayBufferWriter<byte>();");
+                            _builder.AppendLine("var msgPackWriter = new MessagePackWriter(bufferWriter);");
+
+                            _builder.AppendLine($"msgPackWriter.Write(dic.Count);");
+
+                            _builder.AppendLine("foreach (var kv in dic)");
+                            _builder.OpenBracket();
+                            {
+                                _builder.AppendLine("MessagePackSerializer.Serialize(ref msgPackWriter, kv.Value, options);");
+                            }
+                            _builder.CloseBracket();
+
+                            _builder.AppendLine($"msgPackWriter.Flush();");
+
+                            _builder.AppendLine("byte[] bytes = bufferWriter.WrittenSpan.ToArray();");
+
+                            _builder.AppendLine("File.WriteAllBytes(outputPath, bytes);");
+                            _builder.AppendLine($"Console.WriteLine($\"Binary size: {{bytes.Length}} bytes\");");
                         }
                         _builder.CloseBracket();
                     }

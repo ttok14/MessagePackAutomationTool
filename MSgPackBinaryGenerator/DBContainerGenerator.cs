@@ -13,7 +13,7 @@ namespace MSgPackBinaryGenerator
             return _builder.Current.ToString();
         }
 
-        public string Generate(List<TableSchemaDefinition> schemaData, bool includeUnitySupport = false)
+        public string Generate(List<TableSchemaDefinition> schemaData, EnumGroups enumGroup, bool includeUnitySupport = false)
         {
             _builder.AppendLine("//*** Auto Generation Code ***");
             _builder.AppendLine();
@@ -26,6 +26,8 @@ namespace MSgPackBinaryGenerator
             _builder.AppendLine("namespace GameDB");
             _builder.OpenBracket();
             {
+                _builder.AppendLine(enumGroup.ToSourceCode(EnumGroupsSourceCodeForm.Groups));
+
                 _builder.AppendLine("public class GameDBContainer");
                 _builder.OpenBracket();
                 {

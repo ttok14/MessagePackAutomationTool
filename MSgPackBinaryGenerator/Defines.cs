@@ -314,14 +314,10 @@ namespace MSgPackBinaryGenerator
                     {
                         CodeStringBuilder sb = new CodeStringBuilder(512);
 
-                        sb.AppendLine();
-
                         foreach (var e in Enums)
                         {
                             sb.AppendLine(e.Value.ToSourceCode(EnumDefinitionSourceCodeForm.Declaration));
                         }
-
-                        sb.AppendLine();
 
                         return sb.ToString();
                     }
