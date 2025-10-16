@@ -31,11 +31,12 @@ namespace MSgPackBinaryGenerator
                 {
                     // 필드 추가
                     //   e.g public Dictionary<uint, Ability_Table> Ability_Table_data = new Dictionary<uint, Ability_Table>();
-
                     for (int i = 0; i < schemaData.Count; i++)
                     {
                         _builder.AppendLine(schemaData[i].ToSourceCode(DataTableSourceCodeForm.DictionaryField));
-                        _builder.AppendLine();
+
+                        if (i != schemaData.Count - 1)
+                            _builder.AppendLine();
                     }
 
                 }

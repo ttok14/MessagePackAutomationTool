@@ -38,9 +38,10 @@ namespace MSgPackBinaryGenerator
 
         public CodeStringBuilder AppendLine(string str = "")
         {
-            var stringsByLine = str.Split('\n');
+            var stringsByLine = str.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
             for (int i = 0; i < stringsByLine.Length; i++)
             {
+                // .NET의 AppendLine은 현재 환경에 맞는 줄 바꿈 문자를 자동으로 추가해 줌
                 Current.AppendLine(Helper.Indent(IndentLevel, stringsByLine[i]));
             }
             return this;

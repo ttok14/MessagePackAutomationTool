@@ -19,6 +19,7 @@ namespace MSgPackBinaryGenerator
             _builder.AppendLine("using System.Collections.Generic;");
             _builder.AppendLine("using System.IO;");
             _builder.AppendLine("using MessagePack;");
+            _builder.AppendLine("using MessagePack.Resolvers;");
             _builder.AppendLine();
             _builder.AppendLine("namespace GameDB");
             _builder.OpenBracket();
@@ -35,6 +36,22 @@ namespace MSgPackBinaryGenerator
                 _builder.AppendLine("public static class TableBinaryExporter");
                 _builder.OpenBracket();
                 {
+                    _builder.AppendLine($"static TableBinaryExporter()");
+                    _builder.OpenBracket();
+                    {
+                        _builder.AppendLine("MessagePack.Resolvers.MyCompositeResolver.Instance.Register(");
+                        _builder.AppendLine("\tGameDB.Resolvers.GameDBContainerResolver.Instance,");
+                        _builder.AppendLine("\tStandardResolver.Instance");
+                        _builder.AppendLine(");");
+                        _builder.AppendLine();
+                        _builder.AppendLine("MessagePackSerializer.DefaultOptions =");
+                        _builder.AppendLine("\tMessagePackSerializer.DefaultOptions.WithResolver(");
+                        _builder.AppendLine("\t\tMessagePack.Resolvers.MyCompositeResolver.Instance");
+                        _builder.AppendLine("\t);");
+                        _builder.AppendLine("");
+                    }
+                    _builder.CloseBracket();
+
                     foreach (var container in tableContainer)
                     {
                         _builder.AppendLine($"public static void Export{container.SchemaData.TableName}(string outputPath)");

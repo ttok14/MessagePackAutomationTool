@@ -18,22 +18,12 @@ namespace MSgPackBinaryGenerator
                 return txt;
             }
 
-            string tabs = "";
-            for (int i = 0; i < level; i++)
-            {
-                tabs += '\t';
-            }
+            string tabs = new string('\t', level);
 
             StringBuilder sb = new StringBuilder(txt);
-            int startIdx = 0;
-
-            while (startIdx != -1)
-            {
-                sb.Insert(startIdx, tabs);
-                startIdx = sb.IndexOf("\n", startIdx + 1);
-            }
-
-            return sb.ToString();
+            var lines = txt.Split(new string[] { "\r\n", "\n" }, StringSplitOptions.None);
+            var indentedLines = lines.Select(t => tabs + t);
+            return string.Join(Environment.NewLine, indentedLines);
         }
 
         public static bool GetEnumIsFlags(List<EnumMember> value)
