@@ -328,33 +328,4 @@ namespace MSgPackBinaryGenerator
     }
 
     #endregion
-
-    class DataTable_DataSheetContents
-    {
-        /*
-             * e.g 
-             * "ID,Name,ItemType,Price"
-             * */
-        public string column;
-        /*
-             * e.g 
-             * [0] => "1,용사의검,Weapon,15000"
-             * [1] => "2,전사의검,Weapon,23000"
-             */
-        public string[] raws;
-    }
-
-    class DataTable_SchemaSheetContents
-    {
-        /*
-             * e.g.
-             * "ID,Name,ItemType,Price"
-             * */
-        public string column;
-        /*
-             * e.g
-             * "uint,string,eItemType,uint"
-             */
-        public string raw;
-    }
 }

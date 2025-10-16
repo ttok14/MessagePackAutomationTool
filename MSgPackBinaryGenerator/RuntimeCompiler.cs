@@ -10,9 +10,7 @@ namespace MSgPackBinaryGenerator
 {
     public static class RuntimeCompiler
     {
-        // ─────────────────────────────────────────────
-        // 🔹 공통 참조 로직 (MessagePack 완전 포함)
-        // ─────────────────────────────────────────────
+        // 공통 참조 로직
         private static List<MetadataReference> BuildDefaultReferences(string[] additionalReferences = null)
         {
             var refs = new List<MetadataReference>();
@@ -34,7 +32,13 @@ namespace MSgPackBinaryGenerator
             };
 
             foreach (var asm in assemblies.Distinct())
+            {
+                if (string.IsNullOrEmpty(asm.Location))
+                {
+                    Console.WriteLine($"(Critical) AssemblyLocation({asm}) is Empty");
+                }
                 refs.Add(MetadataReference.CreateFromFile(asm.Location));
+            }
 
             // MessagePack 관련 강제 추가
             try
@@ -66,9 +70,7 @@ namespace MSgPackBinaryGenerator
             return refs;
         }
 
-        // ─────────────────────────────────────────────
-        // 🔹 메모리 컴파일 (기존 방식)
-        // ─────────────────────────────────────────────
+        // 메모리 컴파일
         public static Assembly CompileSource(string sourceCode, string[] additionalReferences = null)
         {
             var syntaxTree = CSharpSyntaxTree.ParseText(sourceCode);
@@ -93,43 +95,6 @@ namespace MSgPackBinaryGenerator
 
             ms.Seek(0, SeekOrigin.Begin);
             return Assembly.Load(ms.ToArray());
-        }
-
-        // ─────────────────────────────────────────────
-        // 🔹 디스크에 DLL로 저장하는 버전 (수정 완료)
-        // ─────────────────────────────────────────────
-        public static Assembly CompileSourceToDll(
-            string sourceCode,
-            string[] additionalReferences = null,
-            string outputDir = null,
-            string fileName = null)
-        {
-            outputDir ??= Path.Combine(Directory.GetCurrentDirectory(), "pipeline");
-            Directory.CreateDirectory(outputDir);
-
-            fileName ??= $"Runtime_{Guid.NewGuid():N}.dll";
-            string dllPath = Path.Combine(outputDir, fileName);
-
-            var syntaxTree = CSharpSyntaxTree.ParseText(sourceCode);
-            var compilation = CSharpCompilation.Create(
-                Path.GetFileNameWithoutExtension(fileName),
-                new[] { syntaxTree },
-                BuildDefaultReferences(additionalReferences), // ✅ 변경된 부분
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
-                    .WithOptimizationLevel(OptimizationLevel.Release)
-            );
-
-            var emitResult = compilation.Emit(dllPath);
-            if (!emitResult.Success)
-            {
-                var errors = string.Join("\n", emitResult.Diagnostics
-                    .Where(d => d.Severity == DiagnosticSeverity.Error)
-                    .Select(d => d.ToString()));
-                throw new Exception($"❌ Compilation failed!\n{errors}");
-            }
-
-            Console.WriteLine($"✅ DLL compiled successfully: {dllPath}");
-            return Assembly.LoadFrom(dllPath);
         }
     }
 }

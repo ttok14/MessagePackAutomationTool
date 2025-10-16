@@ -2,6 +2,7 @@
 using MessagePack.Resolvers;
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -10,72 +11,124 @@ namespace MSgPackBinaryGenerator
 {
     class Program
     {
-        static void Main(string[] args)
+        public class SheetEntry
         {
-            var itemTableCsv = File.ReadAllLines(@"C:\Users\LeeYunSeon\source\repos\MSgPackBinaryGenerator\MSgPackBinaryGenerator\Data\ItemTable.csv");
-            var itemTableSchemaCsv = File.ReadAllLines(@"C:\Users\LeeYunSeon\source\repos\MSgPackBinaryGenerator\MSgPackBinaryGenerator\Data\ItemTable_Schema.csv");
+            public string path;
+            public List<string> lines;
 
-            string itemTableTypes = "";
-            string[] itemDataTableColumns = itemTableCsv[0].Split(',');
-
-            for (int i = 0; i < itemDataTableColumns.Length; i++)
+            public string Name => Path.GetFileNameWithoutExtension(path);
+            public SheetEntry(string path)
             {
-                for (int j = 1; j < itemTableSchemaCsv.Length; j++)
-                {
-                    var columnName = itemTableSchemaCsv[j].Split(',')[0];
-                    var typeName = itemTableSchemaCsv[j].Split(',')[1];
+                this.path = path;
+                lines = File.ReadAllLines(path).ToList();
+            }
+        }
 
-                    if (itemDataTableColumns[i] == columnName)
-                    {
-                        itemTableTypes += $",{typeName}";
-                    }
-                }
+        public class DataTable
+        {
+            public SheetEntry DataSheet { get; private set; }
+            public SheetEntry SchemaSheet { get; private set; }
+
+            public TableContainer TableContainer { get; set; }
+
+            public DataTable(string dataPath, string schemaPath)
+            {
+                DataSheet = new SheetEntry(dataPath);
+                SchemaSheet = new SheetEntry(schemaPath);
+            }
+        }
+
+        public class EnumTable
+        {
+            public SheetEntry Sheet { get; set; }
+            public EnumGroups Groups { get; set; }
+
+            public EnumTable(string path)
+            {
+                Sheet = new SheetEntry(path);
+            }
+        }
+
+        static int Main(string[] args)
+        {
+            string inputDirectory = string.Empty;
+            string outputDirectory = string.Empty;
+
+            inputDirectory = Helper.ExtractCommandArgument(args, "-i");
+            if (string.IsNullOrEmpty(inputDirectory))
+            {
+                Console.WriteLine($"사용법 : Program.exe -i [InputDirectory] -o [OutputDirectory]");
+                Console.WriteLine($"[InputDirectory]: 테이블/Enum 의 csv 포맷 파일들을 찾을 디렉터리");
+                Console.WriteLine($"[OutputDirectory] : 메시지팩 결과물 생성 디렉터리");
+                return 1;
             }
 
-            itemTableTypes = itemTableTypes.Trim(',');
+            outputDirectory = Helper.ExtractCommandArgument(args, "-o");
 
-            var classDefinitions = new List<TableSchemaDefinition>();
-            var itemTableDef = new TableSchemaDefinition("ItemTable", itemTableCsv[0], itemTableTypes);
-            classDefinitions.Add(itemTableDef);
+            if (string.IsNullOrEmpty(outputDirectory))
+            {
+                outputDirectory = Directory.GetCurrentDirectory();
+                Console.WriteLine($"결과 파일 생성 디렉토리 자동 설정\n{outputDirectory}");
+            }
 
-            var itemTableCsvList = itemTableCsv.ToList();
-            itemTableCsvList.RemoveAt(0);
-            string[] itemDataRaws = itemTableCsvList.ToArray();
+            List<DataTable> dataTableEntries = Directory.GetFiles(inputDirectory).
+                Where(t => t.EndsWith("EnumTable.csv") == false && t.EndsWith("_Schema.csv") == false).
+                Select(t => new DataTable(t, t.Replace(".csv", string.Empty) + "_Schema.csv")).
+                ToList();
+            EnumTable enumTableEntry = new EnumTable(Path.Combine(inputDirectory, "EnumTable.csv"));
 
+            foreach (var dataTable in dataTableEntries)
+            {
+                string[] dataTableColumns = dataTable.DataSheet.lines[0].Split(',');
+                string typesToDataTableColumns = string.Empty;
+                foreach (var dataCol in dataTableColumns)
+                {
+                    for (int i = 1; i < dataTable.SchemaSheet.lines.Count; i++)
+                    {
+                        string[] keyAndType = dataTable.SchemaSheet.lines[i].Split(',');
+                        if (dataCol == keyAndType[0])
+                        {
+                            typesToDataTableColumns += keyAndType[1] + ",";
+                            break;
+                        }
+                    }
+                }
 
-            var itemTableDataGroup = new TableDataDefinition(itemDataTableColumns, itemDataRaws, itemTableDef);
+                typesToDataTableColumns = typesToDataTableColumns.Trim(',');
 
-            var enumCsv = File.ReadAllLines(@"C:\Users\LeeYunSeon\source\repos\MSgPackBinaryGenerator\MSgPackBinaryGenerator\Data\EnumTable.csv");
-            var raws = enumCsv.ToList();
-            raws.RemoveAt(0);
-            var enumGroup = new EnumGroups(enumCsv[0], raws.ToArray());
+                var tableSchemaDef = new TableSchemaDefinition(dataTable.DataSheet.Name, dataTable.DataSheet.lines[0], typesToDataTableColumns);
+                string[] tableDataRaws = dataTable.DataSheet.lines.Skip(1).ToArray();
+                dataTable.TableContainer = new TableContainer(tableSchemaDef,
+                    new TableDataDefinition(dataTableColumns, tableDataRaws, tableSchemaDef));
+            }
+
+            var enumRaws = enumTableEntry.Sheet.lines.Skip(1).ToArray();
+            enumTableEntry.Groups = new EnumGroups(enumTableEntry.Sheet.lines[0], enumRaws);
 
             var enumGenerator = new DBEnumContainer();
-            var enumSourceCode = enumGenerator.Generate(enumGroup);
-            Console.WriteLine(enumSourceCode);
+            var enumSourceCode = enumGenerator.Generate(enumTableEntry.Groups);
 
-            var generator = new DBContainerGenerator();
-            var dbContainerSourceCode = generator.Generate(new List<TableSchemaDefinition>() { itemTableDef }, enumGroup, includeUnitySupport: true);
+            var dataContainers = dataTableEntries.Select(t => t.TableContainer).ToArray();
+            var dbContainerGenerator = new DBContainerGenerator();
+            var dbContainerSourceCode = dbContainerGenerator.Generate(dataTableEntries.Select(t => t.TableContainer.SchemaData).ToList(), enumTableEntry.Groups);
 
-            Console.WriteLine("--------------------------------------------------");
             var binaryExporter = new BinaryExporterGeneratorGenerator();
-            var itemTableContainer = new TableContainer(classDefinitions[0], itemTableDataGroup);
-            var tableContainer = new List<TableContainer>() { itemTableContainer };
-            var binaryGeneratorSourceCode = binaryExporter.Generate(tableContainer, enumGroup);
+            var binaryGeneratorSourceCode = binaryExporter.Generate(dataContainers, enumTableEntry.Groups);
 
             var mpcInputGenerator = new MpcInputGenerator();
-            var mpcInputSourceCode = mpcInputGenerator.Generate(tableContainer, enumGroup);
+            var mpcInputSourceCode = mpcInputGenerator.Generate(dataContainers, enumTableEntry.Groups);
 
-            StartPipeline(
-                Directory.GetCurrentDirectory(),
+            return StartPipeline(
+                outputDirectory: outputDirectory,
+                dataContainers,
                 mpcInputSourceCode: mpcInputSourceCode,
                 dbContainerSourceCode: dbContainerSourceCode,
                 enumSourceCode: enumSourceCode,
                 binaryGeneratorSourceCode: binaryGeneratorSourceCode);
         }
-
-        static void StartPipeline(
+        static int StartPipeline(
             string outputDirectory,
+            TableContainer[] dataTableContainers,
             string mpcInputSourceCode,
             string dbContainerSourceCode,
             string enumSourceCode,
@@ -84,7 +137,7 @@ namespace MSgPackBinaryGenerator
             Console.WriteLine($"OutputDirectory : {outputDirectory}");
 
             string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-            outputDirectory = $"{outputDirectory}/Result_{timestamp}";
+            outputDirectory = $"{outputDirectory}/MsgPackResult_{timestamp}";
             Directory.CreateDirectory(outputDirectory);
 
             // .cs 파일을 만듬 (여기에 mpc 에서 Formatter 생성할때 필요한 클래스들이 위치)
@@ -106,8 +159,6 @@ namespace MSgPackBinaryGenerator
             // 동일 디렉터리에 생성한 것 만으로도 빌드에 포함되는 것 . 
             string inputDllForMpc = DotnetBuilder.Build(inputProjectForMpc);
 
-            Console.WriteLine("-------------------------");
-
             // Resolver 생성 
             string resolveOutput = Path.Combine(outputDirectory, $"{gameDBResolverName}.cs");
 
@@ -115,22 +166,14 @@ namespace MSgPackBinaryGenerator
             // 이 시점 이전에 의도치않은 .cs 파일 생성은 주의해야함 (e.g GameDBContainer.cs)
             MpcRunner.Run(inputProjectForMpc, resolveOutput);
 
-            Console.WriteLine("-------------------------");
+            // Console.WriteLine("-------------------------");
 
-            Console.WriteLine(binaryGeneratorSourceCode);
-            //RuntimeCompiler.CompileSource(mpcInputSourceCode);
             var resolverSourceCode = File.ReadAllText(resolveOutput);
 
-            // resolver 컴파일해서 어셈블리 겟 
-            // var resolverAssembly = RuntimeCompiler.CompileSource(resolverSourceCode, new string[] { mpcInputDllPath });
-
-            // mpc 결과물인 resolver 는 inputDll 에 있는 타입들 (e.g ItemTable, E_ItemType 등..) 
-            // 을 사용하기 때문에 inputDll 을 넣어줘야 resolverDll 컴파일 가능.
-            var resolverAssembly = RuntimeCompiler.CompileSourceToDll(
+            // Resolver 어셈블리 필요. 컴파일해둠.
+            var resolverAssembly = RuntimeCompiler.CompileSource(
                 resolverSourceCode,
-                new[] { inputDllForMpc },
-                outputDirectory,
-                $"{gameDBResolverName}.dll"
+                new[] { inputDllForMpc }
             );
 
             var currentDllPath = Assembly.GetExecutingAssembly().Location;
@@ -150,24 +193,6 @@ namespace MSgPackBinaryGenerator
                     // 향후 확장성 고려해서 일단 지금 어셈도 추가
                     currentDllPath
                 });
-
-            var type = binaryExporterAssembly.GetType("GameDB.TableBinaryExporter");
-            if (type == null)
-            {
-                Console.WriteLine("❌ TableBinaryExporter 타입을 찾을 수 없습니다.");
-                return;
-            }
-
-            var method = type.GetMethod("ExportItemTable", BindingFlags.Public | BindingFlags.Static, null, new[] { typeof(string), typeof(MessagePackSerializerOptions) }, null);
-            if (method == null)
-            {
-                Console.WriteLine("❌ ExportItemTable 메서드를 찾을 수 없습니다.");
-                return;
-            }
-            else
-            {
-                Console.WriteLine("Method Found : " + method.Name);
-            }
 
             var assemblyPaths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
@@ -191,6 +216,13 @@ namespace MSgPackBinaryGenerator
 
             AppDomain.CurrentDomain.AssemblyResolve += assemblyResolver;
 
+            var type = binaryExporterAssembly.GetType("GameDB.TableBinaryExporter");
+            if (type == null)
+            {
+                Console.WriteLine("❌ TableBinaryExporter 타입을 찾을 수 없습니다.");
+                return 1;
+            }
+
             try
             {
                 // 1. GameDBResolver.Instance를 리플렉션으로 가져옵니다.
@@ -210,23 +242,44 @@ namespace MSgPackBinaryGenerator
                 // 4. 이 리졸버를 포함하는 새로운 옵션 객체를 만듭니다.
                 var options = MessagePackSerializerOptions.Standard.WithResolver(resolver);
 
-                // 5. 생성된 옵션을 메서드에 파라미터로 전달합니다.
-                string binaryOutputPath = Path.Combine(outputDirectory, "ItemTable.bytes");
+                foreach (var container in dataTableContainers)
+                {
+                    var method = type.GetMethod($"Export{container.SchemaData.TableName}", BindingFlags.Public | BindingFlags.Static, null, new[] { typeof(string), typeof(MessagePackSerializerOptions) }, null);
+                    if (method == null)
+                    {
+                        Console.WriteLine($"❌ Export{container.SchemaData.TableName} 메서드를 찾을 수 없습니다.");
+                        return 1;
+                    }
+                    else
+                    {
+                        Console.WriteLine("Method Found : " + method.Name);
+                    }
 
-                Console.WriteLine("\n--- Starting Serialization ---\n");
-                method.Invoke(null, new object[] { binaryOutputPath, options });
-                Console.WriteLine("\n--- Serialization Finished ---\n");
-                // ========================= ▲▲▲ 추가된 부분 2 ▲▲▲ =========================
+                    // 5. 생성된 옵션을 메서드에 파라미터로 전달합니다.
+                    string binaryOutputPath = Path.Combine(outputDirectory, $"{container.SchemaData.TableName}.bytes");
+
+                    Console.WriteLine("\n--- Starting Serialization ---\n");
+                    method.Invoke(null, new object[] { binaryOutputPath, options });
+                    Console.WriteLine("\n--- Serialization Finished ---\n");
+                }
             }
             finally
             {
                 AppDomain.CurrentDomain.AssemblyResolve -= assemblyResolver;
             }
 
-            #region ===:: Binary 생성에 필요하지 않은 파일들은 안전하게 마지막에 생성 (의도치 않은 빌드에 포함 방지)::===
+            #region ===:: Binary 생성에 필요하지 않은 아티팩트 파일 생성 (의도치 않은 빌드에 포함 방지)::===
             File.WriteAllText(Path.Combine(outputDirectory, "GameDBContainer.cs"), dbContainerSourceCode);
             File.WriteAllText(Path.Combine(outputDirectory, "BinaryExporter.cs"), binaryGeneratorSourceCode);
+            File.WriteAllText(Path.Combine(outputDirectory, "GameDBEnums.cs"), enumSourceCode);
             #endregion
+
+            foreach (var file in Directory.GetFiles(outputDirectory))
+            {
+                Console.WriteLine($"최종 파일들 : {file}");
+            }
+
+            return 0;
         }
     }
 }

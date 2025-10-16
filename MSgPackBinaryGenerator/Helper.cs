@@ -95,50 +95,16 @@ namespace MSgPackBinaryGenerator
             return n > 0 && (n & (n - 1)) == 0;
         }
 
-        //public static Assembly CompileSource(string sourceCode)
-        //{
-        //    var syntaxTree = CSharpSyntaxTree.ParseText(sourceCode);
-
-        //    string assemblyName = Path.GetRandomFileName();
-
-        //    // ================== ▼▼▼ 이 부분을 수정합니다 ▼▼▼ ==================
-
-        //    // 현재 실행중인 어플리케이션이 참조하는 모든 어셈블리를 가져옵니다.
-        //    // 이것이 가장 확실하고 안정적인 방법입니다.
-        //    var references = AppDomain.CurrentDomain.GetAssemblies()
-        //        .Where(a => !a.IsDynamic && !string.IsNullOrEmpty(a.Location)) // 동적 어셈블리 및 위치 없는 어셈블리 제외
-        //        .Select(a => MetadataReference.CreateFromFile(a.Location))
-        //        .ToList();
-
-        //    // 만약 MessagePack의 특정 버전이나 추가적인 DLL이 필요하다면 여기에 수동으로 추가할 수도 있습니다.
-        //    // 예: references.Add(MetadataReference.CreateFromFile(typeof(MessagePack.MessagePackSerializer).Assembly.Location));
-
-        //    // ================== ▲▲▲ 여기까지 수정합니다 ▲▲▲ ==================
-
-        //    var compilation = CSharpCompilation.Create(
-        //        assemblyName,
-        //        new[] { syntaxTree },
-        //        references,
-        //        new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
-        //    );
-
-        //    using var ms = new MemoryStream();
-        //    var result = compilation.Emit(ms);
-
-        //    if (!result.Success)
-        //    {
-        //        Console.WriteLine("❌ Compilation failed!");
-        //        foreach (var diag in result.Diagnostics)
-        //        {
-        //            // 에러 메시지를 더 잘보이게 수정
-        //            Console.Error.WriteLine(diag.ToString());
-        //        }
-
-        //        throw new Exception("Compilation failed");
-        //    }
-
-        //    ms.Seek(0, SeekOrigin.Begin);
-        //    return Assembly.Load(ms.ToArray());
-        //}
+        public static string ExtractCommandArgument(string[] args, string targetArg)
+        {
+            for (int i = 0; i < args.Length; i++)
+            {
+                if (args[i] == targetArg && i < args.Length - 1)
+                {
+                    return args[i + 1];
+                }
+            }
+            return string.Empty;
+        }
     }
 }

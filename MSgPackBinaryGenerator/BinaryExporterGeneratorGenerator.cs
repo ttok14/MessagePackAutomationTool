@@ -13,7 +13,7 @@ namespace MSgPackBinaryGenerator
             return _builder.Current.ToString();
         }
 
-        public string Generate(List<TableContainer> tableContainer, EnumGroups enumGroup)
+        public string Generate(TableContainer[] tableContainer, EnumGroups enumGroup)
         {
             _builder.AppendLine("using System;");
             _builder.AppendLine("using System.Collections.Generic;");
@@ -68,6 +68,7 @@ namespace MSgPackBinaryGenerator
                             }
                             _builder.CloseBracket(true);
 
+                            _builder.AppendLine();
                             _builder.AppendLine("var bufferWriter = new ArrayBufferWriter<byte>();");
                             _builder.AppendLine("var msgPackWriter = new MessagePackWriter(bufferWriter);");
 
@@ -88,6 +89,7 @@ namespace MSgPackBinaryGenerator
                             _builder.AppendLine($"Console.WriteLine($\"Binary size: {{bytes.Length}} bytes\");");
                         }
                         _builder.CloseBracket();
+                        _builder.AppendLine();
                     }
                 }
                 _builder.CloseBracket();

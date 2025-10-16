@@ -26,8 +26,6 @@ namespace MSgPackBinaryGenerator
             _builder.AppendLine("namespace GameDB");
             _builder.OpenBracket();
             {
-                _builder.AppendLine(enumGroup.ToSourceCode(EnumGroupsSourceCodeForm.Groups));
-
                 _builder.AppendLine("public class GameDBContainer");
                 _builder.OpenBracket();
                 {
@@ -36,9 +34,6 @@ namespace MSgPackBinaryGenerator
                     for (int i = 0; i < schemaData.Count; i++)
                     {
                         _builder.AppendLine(schemaData[i].ToSourceCode(DataTableSourceCodeForm.DictionaryField));
-
-                        if (i != schemaData.Count - 1)
-                            _builder.AppendLine();
                     }
 
                 }
@@ -47,7 +42,6 @@ namespace MSgPackBinaryGenerator
                 _builder.AppendLine();
 
                 // MessagePack 클래스들 정의
-
                 for (int i = 0; i < schemaData.Count; i++)
                 {
                     var schema = schemaData[i];
