@@ -258,7 +258,7 @@ namespace MSgPackBinaryGenerator
                     }
 
                     // 5. 생성된 옵션을 메서드에 파라미터로 전달합니다.
-                    string binaryOutputPath = Path.Combine(binaryOutputDirectory, $"{container.SchemaData.TableName}.bytes");
+                    string binaryOutputPath = Path.Combine(binaryOutputDirectory, $"{container.SchemaData.TableName}.bin");
 
                     Console.WriteLine("\n--- Starting Serialization ---\n");
                     method.Invoke(null, new object[] { binaryOutputPath, options });
