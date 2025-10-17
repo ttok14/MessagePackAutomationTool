@@ -1,0 +1,5 @@
+Key,Type
+ID,uint
+CharacterType,E_CharacterType
+HP,uint
+MP,uint

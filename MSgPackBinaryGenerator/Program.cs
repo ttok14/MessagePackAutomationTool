@@ -6,6 +6,7 @@ using System.Data;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text.Json;
 
 namespace MSgPackBinaryGenerator
 {
@@ -264,6 +265,15 @@ namespace MSgPackBinaryGenerator
                     method.Invoke(null, new object[] { binaryOutputPath, options });
                     Console.WriteLine("\n--- Serialization Finished ---\n");
                 }
+
+                // 메타데이터 생성하기
+                var metadata = new MetadataGenerator().Generate(binaryOutputDirectory);
+                var jsonOptions = new JsonSerializerOptions() { WriteIndented = true };
+                var jsonString = JsonSerializer.Serialize(metadata, jsonOptions);
+                var jsonOutputDirectory = Path.Combine(outputDirectory, "table_metadata.json");
+                File.WriteAllText(jsonOutputDirectory, jsonString);
+                Console.WriteLine($"Metadata (JSON) 저장 완료 : {jsonOutputDirectory}");
+                Console.WriteLine();
             }
             finally
             {

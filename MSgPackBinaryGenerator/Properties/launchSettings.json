@@ -1,0 +1,9 @@
+{
+  "profiles": {
+    "MSgPackBinaryGenerator": {
+      "commandName": "Project",
+      "commandLineArgs": "-i \"Data\"",
+      "workingDirectory": "$(ProjectDir)"
+    }
+  }
+}

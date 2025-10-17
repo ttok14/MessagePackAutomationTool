@@ -328,4 +328,22 @@ namespace MSgPackBinaryGenerator
     }
 
     #endregion
+
+    #region ====:: Metadata 정의 ::====
+
+    public class FileMetadata
+    {
+        public string Name { get; set; }
+        public string Hash { get; set; }
+        public long ByteSize { get; set; }
+    }
+
+    public class MasterMetadata
+    {
+        public string Version { get; set; }
+        public string TotalHash { get; set; }
+        public List<FileMetadata> Files { get; set; } = new List<FileMetadata>();
+    }
+
+    #endregion
 }

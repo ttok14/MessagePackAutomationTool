@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Security.Cryptography;
 using System.Text;
 
 namespace MSgPackBinaryGenerator
@@ -105,6 +106,29 @@ namespace MSgPackBinaryGenerator
                 }
             }
             return string.Empty;
+        }
+
+        public static string GetHashByFilePath(string filePath)
+        {
+            using (var stream = File.OpenRead(filePath))
+            using (var sha256 = SHA256.Create())
+            {
+                byte[] hashBytes = sha256.ComputeHash(stream);
+                string hashString = BitConverter.ToString(hashBytes).Replace("-", "").ToLowerInvariant();
+
+                return hashString;
+            }
+        }
+
+        public static string GetHashByString(string str)
+        {
+            using (var sha256 = SHA256.Create())
+            {
+                byte[] hashBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(str));
+                string hashString = BitConverter.ToString(hashBytes).Replace("-", "").ToLowerInvariant();
+
+                return hashString;
+            }
         }
     }
 }
