@@ -241,6 +241,8 @@ namespace MSgPackBinaryGenerator
 
                 // 4. 이 리졸버를 포함하는 새로운 옵션 객체를 만듭니다.
                 var options = MessagePackSerializerOptions.Standard.WithResolver(resolver);
+                string binaryOutputDirectory = Path.Combine(outputDirectory, "binaries");
+                Directory.CreateDirectory(binaryOutputDirectory);
 
                 foreach (var container in dataTableContainers)
                 {
@@ -256,7 +258,7 @@ namespace MSgPackBinaryGenerator
                     }
 
                     // 5. 생성된 옵션을 메서드에 파라미터로 전달합니다.
-                    string binaryOutputPath = Path.Combine(outputDirectory, $"{container.SchemaData.TableName}.bytes");
+                    string binaryOutputPath = Path.Combine(binaryOutputDirectory, $"{container.SchemaData.TableName}.bytes");
 
                     Console.WriteLine("\n--- Starting Serialization ---\n");
                     method.Invoke(null, new object[] { binaryOutputPath, options });
