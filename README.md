@@ -107,4 +107,31 @@
             }
         }
       ```
-      
+
+6. 파일 버전 관리용 메타데이터 사용
+
+
+         ```json
+        {
+          "Version": "251019_031207",
+          "TotalHash": "bbc66182a1e45241b51de6f843e85e2301eb167dffcdcc97c4dfdc8d05f9e7ea",
+          "Files": [
+            {
+              "Name": "CharacterTable",
+              "Hash": "53610e8ae608cb77d62969ddef9661601af2d6fdff09a60d49bdc3d0fbfb84c5",
+              "ByteSize": 129
+            },
+            {
+              "Name": "ItemTable",
+              "Hash": "24ef1da6c498d16c06093692d3cce39f40c275fc8352f8f66a64f9843a502ef9",
+              "ByteSize": 154
+            }
+          ]
+        }
+
+   Version : {연월일_시간분초} 로 버저닝한 문자열
+   TotalHash : 모든 개별 테이블들의 해쉬를 재가공한 해쉬, 테이블 전체에 대한 버전 무결성 검증용
+   Files : 개별 테이블들
+       Name : 테이블명
+       Hash : 테이블 해쉬
+       ByteSize : 바이트 사이즈
