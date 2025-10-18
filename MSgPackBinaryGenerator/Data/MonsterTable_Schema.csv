@@ -1,0 +1,5 @@
+Key,Type
+ID,uint
+MonsterType,E_MonsterType
+HP,uint
+MP,uint

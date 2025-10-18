@@ -5,3 +5,7 @@ E_ItemType,False,Weapon,2,무기 아이템
 E_CharacterType,False,None,0,없음
 E_CharacterType,False,Warrior,1,강력한 전사!
 E_CharacterType,False,Thief,2,도둑놈의 쉐키
+E_MonsterType,False,Goblin,0,뻐킹 센 고블린
+E_MonsterType,False,Zombie,1,뻐킹 센 좀비
+E_MonsterType,False,Ninja,2,뻐킹 센 닌자
+E_MonsterType,False,Ghost,3,뻐킹 센 고스트
