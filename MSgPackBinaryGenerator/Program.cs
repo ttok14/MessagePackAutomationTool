@@ -142,7 +142,7 @@ namespace MSgPackBinaryGenerator
             Directory.CreateDirectory(outputDirectory);
 
             // .cs 파일을 만듬 (여기에 mpc 에서 Formatter 생성할때 필요한 클래스들이 위치)
-            string srcPath = Path.Combine(outputDirectory, "MpcInput.cs");
+            string srcPath = Path.Combine(outputDirectory, "MpcInput_Artifact.cs");
             File.WriteAllText(srcPath, mpcInputSourceCode);
 
             //Console.WriteLine($"Saved source code to: {srcPath}");
@@ -161,15 +161,15 @@ namespace MSgPackBinaryGenerator
             string inputDllForMpc = DotnetBuilder.Build(inputProjectForMpc);
 
             // Resolver 생성 
-            string resolveOutput = Path.Combine(outputDirectory, $"{gameDBResolverName}.cs");
+            string resolverOutput = Path.Combine(outputDirectory, $"{gameDBResolverName}.cs");
 
             // mpc 도 내부적으로 MSBuild 로 빌드를 하기 때문에 
             // 이 시점 이전에 의도치않은 .cs 파일 생성은 주의해야함 (e.g GameDBContainer.cs)
-            MpcRunner.Run(inputProjectForMpc, resolveOutput);
+            MpcRunner.Run(inputProjectForMpc, resolverOutput);
 
             // Console.WriteLine("-------------------------");
 
-            var resolverSourceCode = File.ReadAllText(resolveOutput);
+            var resolverSourceCode = File.ReadAllText(resolverOutput);
 
             // Resolver 어셈블리 필요. 컴파일해둠.
             var resolverAssembly = RuntimeCompiler.CompileSource(
@@ -280,10 +280,15 @@ namespace MSgPackBinaryGenerator
                 AppDomain.CurrentDomain.AssemblyResolve -= assemblyResolver;
             }
 
+            string directoryForImportants = "components";
+
+            Directory.CreateDirectory(Path.Combine(outputDirectory, directoryForImportants));
+
             #region ===:: Binary 생성에 필요하지 않은 아티팩트 파일 생성 (의도치 않은 빌드에 포함 방지)::===
-            File.WriteAllText(Path.Combine(outputDirectory, "GameDBContainer.cs"), dbContainerSourceCode);
-            File.WriteAllText(Path.Combine(outputDirectory, "BinaryExporter.cs"), binaryGeneratorSourceCode);
-            File.WriteAllText(Path.Combine(outputDirectory, "GameDBEnums.cs"), enumSourceCode);
+            File.Move(resolverOutput, Path.Combine(outputDirectory, directoryForImportants, $"{gameDBResolverName}.cs"));
+            File.WriteAllText(Path.Combine(outputDirectory, directoryForImportants, "GameDBContainer.cs"), dbContainerSourceCode);
+            File.WriteAllText(Path.Combine(outputDirectory, directoryForImportants, "GameDBEnums.cs"), enumSourceCode);
+            File.WriteAllText(Path.Combine(outputDirectory, "BinaryExporter_Artifact.cs"), binaryGeneratorSourceCode);
             #endregion
 
             foreach (var file in Directory.GetFiles(outputDirectory))
