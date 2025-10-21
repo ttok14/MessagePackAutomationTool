@@ -139,7 +139,10 @@ namespace MSgPackBinaryGenerator
 
             string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
             outputDirectory = $"{outputDirectory}/MsgPackResult_{timestamp}";
+            string errorDebugDirectory = Path.Combine(outputDirectory, "ErrorReport");
+
             Directory.CreateDirectory(outputDirectory);
+            Directory.CreateDirectory(errorDebugDirectory);
 
             // .cs 파일을 만듬 (여기에 mpc 에서 Formatter 생성할때 필요한 클래스들이 위치)
             string srcPath = Path.Combine(outputDirectory, "MpcInput_Artifact.cs");
@@ -170,12 +173,12 @@ namespace MSgPackBinaryGenerator
             // Console.WriteLine("-------------------------");
 
             var resolverSourceCode = File.ReadAllText(resolverOutput);
+            Assembly resolverAssembly = null;
 
             // Resolver 어셈블리 필요. 컴파일해둠.
-            var resolverAssembly = RuntimeCompiler.CompileSource(
+            resolverAssembly = RuntimeCompiler.CompileSource(
                 resolverSourceCode,
-                new[] { inputDllForMpc }
-            );
+                new[] { inputDllForMpc });
 
             var currentDllPath = Assembly.GetExecutingAssembly().Location;
 
@@ -194,6 +197,15 @@ namespace MSgPackBinaryGenerator
                     // 향후 확장성 고려해서 일단 지금 어셈도 추가
                     currentDllPath
                 });
+
+            if (binaryExporterAssembly == null)
+            {
+                File.WriteAllText(Path.Combine(errorDebugDirectory, $"{gameDBResolverName}.cs"), resolverSourceCode);
+                File.WriteAllText(Path.Combine(errorDebugDirectory, "GameDBContainer.cs"), dbContainerSourceCode);
+                File.WriteAllText(Path.Combine(errorDebugDirectory, "GameDBEnums.cs"), enumSourceCode);
+                File.WriteAllText(Path.Combine(errorDebugDirectory, "BinaryExporter_Artifact.cs"), binaryGeneratorSourceCode);
+                return 1;
+            }
 
             var assemblyPaths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {

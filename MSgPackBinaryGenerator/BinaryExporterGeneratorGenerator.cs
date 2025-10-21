@@ -45,7 +45,11 @@ namespace MSgPackBinaryGenerator
                                         var record = element.Records[i];
                                         string value = record.Value;
 
-                                        if (record.SchemaData.Type == DataRecordDataType.Enum)
+                                        if (record.SchemaData.Type == DataRecordDataType.Boolean)
+                                        {
+                                            value = $"bool.Parse(\"{value}\")";
+                                        }
+                                        else if (record.SchemaData.Type == DataRecordDataType.Enum)
                                         {
                                             value = $"{record.SchemaData.TypeName}.{value}";
                                         }

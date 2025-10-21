@@ -76,7 +76,11 @@ namespace MSgPackBinaryGenerator
                 throw new ArgumentException($"Wrong DataType");
             }
 
-            if (dataType == "string")
+            if (dataType.Equals("bool", StringComparison.OrdinalIgnoreCase) || dataType.Equals("boolean", StringComparison.OrdinalIgnoreCase))
+            {
+                return DataRecordDataType.Boolean;
+            }
+            else if (dataType.Equals("string", StringComparison.OrdinalIgnoreCase))
             {
                 return DataRecordDataType.String;
             }

@@ -2,6 +2,7 @@
 using Microsoft.CodeAnalysis.CSharp;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -90,7 +91,9 @@ namespace MSgPackBinaryGenerator
                 var errors = string.Join("\n", emitResult.Diagnostics
                     .Where(d => d.Severity == DiagnosticSeverity.Error)
                     .Select(d => d.ToString()));
-                throw new Exception($"❌ Compilation failed!\n{errors}");
+
+                Console.WriteLine($"*** Compilation ERROR ! : {errors}");
+                return null;
             }
 
             ms.Seek(0, SeekOrigin.Begin);

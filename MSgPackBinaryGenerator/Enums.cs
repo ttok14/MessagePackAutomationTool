@@ -31,6 +31,8 @@ namespace MSgPackBinaryGenerator
 
         // 일반적인 숫자 등 
         Normal,
+        // 불리언
+        Boolean,
         // 문자열 (" ")
         String,
         // Enum 타입 ( E_xxx.xxx )
