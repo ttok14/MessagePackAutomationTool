@@ -68,7 +68,8 @@ namespace MSgPackBinaryGenerator
 
             if (string.IsNullOrEmpty(outputDirectory))
             {
-                outputDirectory = Directory.GetCurrentDirectory();
+                string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                outputDirectory = Path.Combine(Directory.GetCurrentDirectory(), $"Result_{timestamp}");
                 Console.WriteLine($"결과 파일 생성 디렉토리 자동 설정\n{outputDirectory}");
             }
 
@@ -137,8 +138,6 @@ namespace MSgPackBinaryGenerator
         {
             Console.WriteLine($"OutputDirectory : {outputDirectory}");
 
-            string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-            outputDirectory = $"{outputDirectory}/MsgPackResult_{timestamp}";
             string errorDebugDirectory = Path.Combine(outputDirectory, "ErrorReport");
 
             Directory.CreateDirectory(outputDirectory);
@@ -271,7 +270,7 @@ namespace MSgPackBinaryGenerator
                     }
 
                     // 5. 생성된 옵션을 메서드에 파라미터로 전달합니다.
-                    string binaryOutputPath = Path.Combine(binaryOutputDirectory, $"{container.SchemaData.TableName}.bin");
+                    string binaryOutputPath = Path.Combine(binaryOutputDirectory, $"{container.SchemaData.TableName}.{Constants.BinaryOutputExtension}");
 
                     Console.WriteLine("\n--- Starting Serialization ---\n");
                     method.Invoke(null, new object[] { binaryOutputPath, options });

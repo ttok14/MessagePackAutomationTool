@@ -17,7 +17,7 @@ namespace MSgPackBinaryGenerator
             MasterMetadata result = new MasterMetadata();
             List<string> results = new List<string>();
 
-            var filePaths = Directory.GetFiles(binaryDirectory, "*.bin").OrderBy(p => p);
+            var filePaths = Directory.GetFiles(binaryDirectory, $"*.{Constants.BinaryOutputExtension}").OrderBy(p => p);
             foreach (var path in filePaths)
             {
                 var name = Path.GetFileNameWithoutExtension(path);
