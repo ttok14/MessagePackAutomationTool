@@ -246,13 +246,14 @@ namespace MSgPackBinaryGenerator
                 var loggingStandardResolver = new LoggingResolver(StandardResolver.Instance, "StandardResolver");
 
                 // 3. 로그를 출력하는 리졸버들을 조합합니다.
-                var resolver = CompositeResolver.Create(
+                MyCompositeResolver.Instance.Register(
                     loggingGameDBResolver,
                     loggingStandardResolver
                 );
 
                 // 4. 이 리졸버를 포함하는 새로운 옵션 객체를 만듭니다.
-                var options = MessagePackSerializerOptions.Standard.WithResolver(resolver);
+                var options = MessagePackSerializerOptions.Standard.WithResolver(MyCompositeResolver.Instance);
+                MessagePackSerializer.DefaultOptions = options;
                 string binaryOutputDirectory = Path.Combine(outputDirectory, "binaries");
                 Directory.CreateDirectory(binaryOutputDirectory);
 
