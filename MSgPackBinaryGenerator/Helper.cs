@@ -69,6 +69,11 @@ namespace MSgPackBinaryGenerator
             return name.StartsWith("E_");
         }
 
+        public static bool IsArray(string typeName)
+        {
+            return typeName.NoSpace().EndsWith("[]");
+        }
+
         public static DataRecordDataType ToDataType(string dataType)
         {
             if (string.IsNullOrEmpty(dataType))
@@ -76,9 +81,35 @@ namespace MSgPackBinaryGenerator
                 throw new ArgumentException($"Wrong DataType");
             }
 
-            if (dataType.Equals("bool", StringComparison.OrdinalIgnoreCase) || dataType.Equals("boolean", StringComparison.OrdinalIgnoreCase))
+            dataType = dataType.NoSpace().Replace("[]", "");
+
+            if (dataType.Equals("int", StringComparison.OrdinalIgnoreCase))
+            {
+                return DataRecordDataType.Integer;
+            }
+            if (dataType.Equals("uint", StringComparison.OrdinalIgnoreCase))
+            {
+                return DataRecordDataType.Uint;
+            }
+            else if (dataType.Equals("long", StringComparison.OrdinalIgnoreCase))
+            {
+                return DataRecordDataType.Long;
+            }
+            else if (dataType.Equals("ulong", StringComparison.OrdinalIgnoreCase))
+            {
+                return DataRecordDataType.Ulong;
+            }
+            else if (dataType.Equals("bool", StringComparison.OrdinalIgnoreCase) || dataType.Equals("boolean", StringComparison.OrdinalIgnoreCase))
             {
                 return DataRecordDataType.Boolean;
+            }
+            else if (dataType.Equals("float", StringComparison.OrdinalIgnoreCase))
+            {
+                return DataRecordDataType.Float;
+            }
+            else if (dataType.Equals("double", StringComparison.OrdinalIgnoreCase))
+            {
+                return DataRecordDataType.Double;
             }
             else if (dataType.Equals("string", StringComparison.OrdinalIgnoreCase))
             {
@@ -88,8 +119,140 @@ namespace MSgPackBinaryGenerator
             {
                 return DataRecordDataType.Enum;
             }
+            else if (dataType.Equals("Vector2Int", StringComparison.OrdinalIgnoreCase))
+            {
+                return DataRecordDataType.Vector2Int;
+            }
 
-            return DataRecordDataType.Normal;
+            Console.WriteLine($"** 데이터 타입이 기존에 정의한 데이터 타입을 벗어난다 !! : {dataType}");
+            return DataRecordDataType.Etc;
+        }
+
+        public static string ValueStringToCode(string rawTypeName, string value)
+        {
+            rawTypeName = rawTypeName.NoSpace();
+            // csv 데이터 특성상 배열을 넘기려면 컴마때문에 
+            // 쌍따옴표 사용이 불가피해서 먼저 제거.
+            value = value.StripQuotes();
+            string valueSuffix = string.Empty;
+            bool isArray = IsArray(rawTypeName);
+            var dataType = ToDataType(rawTypeName);
+
+            // Array 여부 체크 
+            // e.g value => (1,2,3) ? 1,2,3 ? [1,2,3] ?  다 지원해줄까? 
+            if (isArray)
+            {
+                // e.g new int[] { 
+                valueSuffix = $"new {rawTypeName} {{ ";
+            }
+
+            if (dataType == DataRecordDataType.Integer ||
+                dataType == DataRecordDataType.Uint ||
+                dataType == DataRecordDataType.Long ||
+                dataType == DataRecordDataType.Ulong)
+            {
+                if (isArray)
+                {
+                    // 1,2,3,4 .. 형태로 
+                    value = value.GetElementsFromArrayInSingleLine(false);
+                }
+                else
+                {
+                    // 배열아니면 그냥 패스
+                    value = $"{value}";
+                }
+            }
+            else if (dataType == DataRecordDataType.Boolean)
+            {
+                if (isArray)
+                {
+                    value = string.Join(',',
+                        value.GetElementsFromArrayInSingleLine(false).Split(',').
+                        Select(t => $"bool.Parse(\"{t}\")"));
+                }
+                else
+                {
+                    // bool 로 파싱 e.g bool.Parse("true")
+                    value = $"bool.Parse(\"{value}\")";
+                }
+            }
+            else if (dataType == DataRecordDataType.Float)
+            {
+                if (isArray)
+                {
+                    value = string.Join(',',
+                        value.GetElementsFromArrayInSingleLine(false).Split(',').
+                        Select(t => $"float.Parse(\"{t}\")"));
+                }
+                else
+                {
+                    // 뒤에 f추가 (e.g 0.5f)
+                    value = $"{value}f";
+                }
+            }
+            else if (dataType == DataRecordDataType.Double)
+            {
+                if (isArray)
+                {
+                    value = string.Join(',',
+                        value.GetElementsFromArrayInSingleLine(false).Split(',').
+                        Select(t => $"double.Parse(\"{t}\")"));
+                }
+                else
+                {
+                    // 문자 그대로 넣어주면 됨 (e.g 0.5)
+                    value = $"{value}";
+                }
+            }
+            else if (dataType == DataRecordDataType.Vector2Int)
+            {
+                // value 가 1,2,3 이나 1.3,1.5 이런식이나 
+                // value 에 (1,2) 이런식으로 들어옴 
+                if (isArray)
+                {
+                    // [0] : "1,2"
+                    // [1] : "3,4" ...
+                    var elements = value.ExtractDataElementsFromArray(true);
+                    value = string.Join(',', elements.Select(e =>
+                    {
+                        var pos = e.Split(',');
+                        return $"new Vector2Int({pos[0]},{pos[1]})";
+                    }));
+                }
+                else
+                {
+                    // 문자 그대로 넣어주면 됨 (e.g 0.5)
+                    value = $"new Vector2Int({value.StripAllBrackets()})";
+                }
+            }
+            else if (dataType == DataRecordDataType.Enum)
+            {
+                if (isArray)
+                {
+                    value = string.Join(',',
+                        value.GetElementsFromArrayInSingleLine(false).Split(',').
+                        Select(e => $"{rawTypeName}.{e}"));
+                }
+                else
+                {
+                    value = $"{rawTypeName}.{value}";
+                }
+            }
+            else if (dataType == DataRecordDataType.String)
+            {
+                if (isArray)
+                {
+                    value = string.Join(',',
+                        value.GetElementsFromArrayInSingleLine(false).Split(',').
+                        Select(e => $"\"{value}\""));
+                }
+                else
+                {
+                    value = $"\"{value}\"";
+                }
+            }
+
+            return value;
         }
 
         public static bool IsPowerOfTwo(int n)
@@ -133,6 +296,81 @@ namespace MSgPackBinaryGenerator
 
                 return hashString;
             }
+        }
+    }
+
+    public static class StringEx
+    {
+        public static string NoSpace(this string str)
+        {
+            return str.Replace(" ", "");
+        }
+
+        public static string StripQuotes(this string str)
+        {
+            return str.NoSpace().Replace("\'", "").Replace("\"", "");
+        }
+
+        public static string StripAllBrackets(this string str)
+        {
+            return str.NoSpace().Replace("(", "").Replace(")", "").Replace("[", "").Replace("]", "");
+        }
+
+        public static string GetElementsFromArrayInSingleLine(this string str, bool multipleValuesPerElements)
+        {
+            /*
+             * e.g 
+             * 다음 케이스에 대해 요소들만 Comma(,) 로 구분짓는 기존 상태로 반환해줌 
+             *  1,2,3,4 => [0] : 1 , [1] : 2 , [2] : 3 , [3] : 4
+             *  (1,2,3,4) => 위와 동일
+             *  [1,2,3,4] => 위와 동일
+             *  (1,2),(3,4) => [0] : 1,2 , [1] : 3,4
+             *  [1,2],[3,4] => 위와동일
+             * */
+            if (multipleValuesPerElements)
+            {
+                // 괄호/대괄호 둘다 지원하기 위해 처리
+                if (str.Contains("("))
+                {
+                    // (1,2),(3,4) => 1,2),(3,4 => Split("),(")
+                    return str.NoSpace().Substring(1, str.Length - 2);
+                }
+                else if (str.Contains("["))
+                {
+                    // [1,2],[3,4] => 1,2],[3,4 => Split("],[")
+                    return str.NoSpace().Substring(1, str.Length - 2);
+                }
+            }
+            else
+            {
+                return str.NoSpace().StripAllBrackets();
+            }
+
+            return null;
+        }
+
+        public static string[] ExtractDataElementsFromArray(this string str, bool multipleValuesPerElements)
+        {
+            if (multipleValuesPerElements)
+            {
+                // 괄호/대괄호 둘다 지원하기 위해 처리
+                if (str.Contains("("))
+                {
+                    // (1,2),(3,4) => 1,2),(3,4 => Split("),(")
+                    return str.GetElementsFromArrayInSingleLine(multipleValuesPerElements).Split("),(");
+                }
+                else if (str.Contains("["))
+                {
+                    // [1,2],[3,4] => 1,2],[3,4 => Split("],[")
+                    return str.GetElementsFromArrayInSingleLine(multipleValuesPerElements).Split("],[");
+                }
+            }
+            else
+            {
+                return str.GetElementsFromArrayInSingleLine(multipleValuesPerElements).Split(',');
+            }
+
+            return null;
         }
     }
 }

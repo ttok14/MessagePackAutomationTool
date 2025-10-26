@@ -22,6 +22,7 @@ namespace MSgPackBinaryGenerator
   <ItemGroup>
     <PackageReference Include=""MessagePack"" Version=""3.1.4"" />
     <PackageReference Include=""MessagePack.Annotations"" Version=""3.1.4"" />
+    <PackageReference Include=""MessagePack.UnityShims"" Version=""3.1.4"" />
   </ItemGroup>
 </Project>";
 

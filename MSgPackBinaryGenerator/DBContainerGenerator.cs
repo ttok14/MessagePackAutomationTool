@@ -13,14 +13,13 @@ namespace MSgPackBinaryGenerator
             return _builder.Current.ToString();
         }
 
-        public string Generate(List<TableSchemaDefinition> schemaData, EnumGroups enumGroup, bool includeUnitySupport = false)
+        public string Generate(List<TableSchemaDefinition> schemaData, EnumGroups enumGroup)
         {
             _builder.AppendLine("//*** Auto Generation Code ***");
             _builder.AppendLine();
             _builder.AppendLine("using System;");
             _builder.AppendLine("using System.Collections.Generic;");
-            if (includeUnitySupport)
-                _builder.AppendLine("using UnityEngine;");
+            _builder.AppendLine("using UnityEngine;");
             _builder.AppendLine("using MessagePack;");
             _builder.AppendLine();
             _builder.AppendLine("namespace GameDB");

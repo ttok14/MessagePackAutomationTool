@@ -29,13 +29,24 @@ namespace MSgPackBinaryGenerator
     {
         None = -1,
 
-        // 일반적인 숫자 등 
-        Normal,
+        // 정수
+        Integer,
+        Uint,
+        Long,
+        Ulong,
+        // 소수 Single
+        Float,
+        // 소수
+        Double,
+        // 유니티 Vector2Int 타입
+        Vector2Int,
         // 불리언
         Boolean,
         // 문자열 (" ")
         String,
         // Enum 타입 ( E_xxx.xxx )
-        Enum
+        Enum,
+
+        Etc
     }
 }

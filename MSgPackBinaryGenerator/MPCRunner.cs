@@ -17,7 +17,7 @@ namespace MSgPackBinaryGenerator
             string mpcArgs =
                 $"-i \"{inputProjectOrDll}\" " +
                 $"-o \"{outputPath}\" " +
-                $"-r {resolverName} " +
+                $"-r \"{resolverName}\" " +
                 $"-n GameDB " +
                 $"-m resolver";
 

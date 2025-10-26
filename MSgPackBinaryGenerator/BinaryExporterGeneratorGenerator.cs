@@ -1,6 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Numerics;
+using System.Reflection.Metadata;
 using System.Text;
+using UnityEngine;
 
 namespace MSgPackBinaryGenerator
 {
@@ -21,6 +24,7 @@ namespace MSgPackBinaryGenerator
             _builder.AppendLine("using MessagePack;");
             _builder.AppendLine("using MessagePack.Resolvers;");
             _builder.AppendLine("using System.Buffers;");
+            _builder.AppendLine("using UnityEngine;");
             _builder.AppendLine();
             _builder.AppendLine("namespace GameDB");
             _builder.OpenBracket();
@@ -43,26 +47,24 @@ namespace MSgPackBinaryGenerator
                                     {
                                         bool isID = i == 0;
                                         var record = element.Records[i];
-                                        string value = record.Value;
+                                        bool isArray = record.SchemaData.IsArray;
+                                        string value = Helper.ValueStringToCode(record.SchemaData.TypeName, record.Value);
 
-                                        if (record.SchemaData.Type == DataRecordDataType.Boolean)
+                                        if (isArray)
                                         {
-                                            value = $"bool.Parse(\"{value}\")";
-                                        }
-                                        else if (record.SchemaData.Type == DataRecordDataType.Enum)
-                                        {
-                                            value = $"{record.SchemaData.TypeName}.{value}";
-                                        }
-                                        else if (record.SchemaData.Type == DataRecordDataType.String)
-                                        {
-                                            value = $"\"{value}\"";
+                                            // e.g new Int[] { 1,2,3 
+                                            value = $"new {record.SchemaData.TypeName} {{ " + value + $"}}";
                                         }
 
                                         if (isID)
                                         {
+                                            // e.g [2] = new ItemTable { 
+                                            // e.g [2] = new int[] {
                                             _builder.AppendIndent($"[{value}] = new {container.SchemaData.TableName} {{ ");
                                         }
 
+                                        // e.g [2] = new ItemTable { ID = 2, ...
+                                        // e.g [2] = new ItemTable { IdList = new int() { 1,2,3 },
                                         _builder.Append($"{record.SchemaData.Name} = {value},");
                                     }
 

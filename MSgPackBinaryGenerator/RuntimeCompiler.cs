@@ -1,5 +1,6 @@
 ﻿using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -23,6 +24,7 @@ namespace MSgPackBinaryGenerator
                 typeof(Enumerable).Assembly,                 // System.Linq
                 typeof(List<>).Assembly,                     // System.Collections
                 typeof(System.Runtime.AssemblyTargetedPatchBandAttribute).Assembly, // System.Runtime
+                typeof(UnityEngine.Vector2Int).Assembly,    // 유니티 타입 참조땜시 필요. 
                 Assembly.Load("netstandard"),
                 Assembly.Load("System.Private.CoreLib"),
                 Assembly.Load("System.Runtime"),
@@ -30,6 +32,7 @@ namespace MSgPackBinaryGenerator
                 Assembly.Load("System.Console"),
                 Assembly.Load("System.Linq"),
                 Assembly.Load("System.Memory"),
+
             };
 
             foreach (var asm in assemblies.Distinct())
@@ -72,7 +75,7 @@ namespace MSgPackBinaryGenerator
         }
 
         // 메모리 컴파일
-        public static Assembly CompileSource(string sourceCode, string[] additionalReferences = null)
+        public static Assembly CompileSource(string debugName, string sourceCode, string[] additionalReferences = null, Action<string> onError = null)
         {
             var syntaxTree = CSharpSyntaxTree.ParseText(sourceCode);
 
@@ -92,7 +95,7 @@ namespace MSgPackBinaryGenerator
                     .Where(d => d.Severity == DiagnosticSeverity.Error)
                     .Select(d => d.ToString()));
 
-                Console.WriteLine($"*** Compilation ERROR ! : {errors}");
+                onError?.Invoke($"*** ({debugName}) | Compilation ERROR ! : {errors}");
                 return null;
             }
 

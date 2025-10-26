@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
 
 namespace MSgPackBinaryGenerator
 {
@@ -13,6 +15,7 @@ namespace MSgPackBinaryGenerator
         public string TypeName { get; set; }
         public int KeyIndex { get; set; }
 
+        public bool IsArray => Helper.IsArray(TypeName);
         // 이 규칙을 잘 준수해야함. (enum 은 E_ 로 시작한다)
         public DataRecordDataType Type => Helper.ToDataType(TypeName);
     }
@@ -142,40 +145,48 @@ namespace MSgPackBinaryGenerator
     {
         public List<TableValueElement> DataList;
 
-        public TableDataDefinition(string[] columns, string[] dataRaws, TableSchemaDefinition schemaData)
+        public TableDataDefinition(string dataCsvPath, string[] columns, TableSchemaDefinition schemaData)
         {
             var schemaLookupTable = new Dictionary<string, TableSchemaDefinitionField>();
-
             DataList = new List<TableValueElement>();
 
-            for (int i = 0; i < dataRaws.Length; i++)
+            // CsvHelper 구성
+            var config = new CsvHelper.Configuration.CsvConfiguration(CultureInfo.InvariantCulture)
             {
-                string[] values = dataRaws[i].Split(',');
-                if (columns.Length != values.Length)
-                {
-                    throw new ArgumentException($"Column Length and Data Length does not match | Column Length : {columns.Length} , Data Length : {values.Length}");
-                }
+                HasHeaderRecord = true, 
+            };
 
-                var newElement = new TableValueElement();
-                for (int j = 0; j < values.Length; j++)
+            using (var reader = new StreamReader(dataCsvPath))
+            using (var csv = new CsvHelper.CsvReader(reader, config))
+            {
+                csv.Read();
+                csv.ReadHeader(); 
+
+                while (csv.Read()) 
                 {
-                    var column = columns[j];
-                    if (schemaLookupTable.TryGetValue(column, out var schema) == false)
+                    var newElement = new TableValueElement();
+                    for (int j = 0; j < columns.Length; j++)
                     {
-                        schema = schemaData.Fields.Find(t => t.Name == column);
-                        if (schema == null)
+                        var column = columns[j];
+                        string value = csv.GetField(j);
+
+                        if (schemaLookupTable.TryGetValue(column, out var schema) == false)
                         {
-                            throw new Exception($"Failed to retrieve Schema data due to Non matching Schema Name : {column}");
+                            schema = schemaData.Fields.Find(t => t.Name == column);
+                            if (schema == null)
+                            {
+                                throw new Exception($"Failed to retrieve Schema data due to Non matching Schema Name : {column}");
+                            }
                         }
-                    }
 
-                    newElement.Records.Add(new TableValueRecord()
-                    {
-                        SchemaData = schema,
-                        Value = values[j]
-                    });
+                        newElement.Records.Add(new TableValueRecord()
+                        {
+                            SchemaData = schema,
+                            Value = value 
+                        });
+                    }
+                    DataList.Add(newElement);
                 }
-                DataList.Add(newElement);
             }
         }
     }

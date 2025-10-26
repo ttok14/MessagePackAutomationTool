@@ -18,6 +18,7 @@ namespace MSgPackBinaryGenerator
             _builder.AppendLine("using System;");
             _builder.AppendLine("using System.Collections.Generic;");
             _builder.AppendLine("using MessagePack;");
+            _builder.AppendLine("using UnityEngine;");
             _builder.AppendLine();
             _builder.AppendLine("namespace GameDB");
             _builder.OpenBracket();

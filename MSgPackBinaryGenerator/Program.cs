@@ -1,5 +1,6 @@
 ﻿using MessagePack;
 using MessagePack.Resolvers;
+using MessagePack.Unity;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -98,10 +99,14 @@ namespace MSgPackBinaryGenerator
 
                 typesToDataTableColumns = typesToDataTableColumns.Trim(',');
 
+                //var tableSchemaDef = new TableSchemaDefinition(dataTable.DataSheet.Name, dataTable.DataSheet.lines[0], typesToDataTableColumns);
+                //string[] tableDataRaws = dataTable.DataSheet.lines.Skip(1).ToArray();
+                //dataTable.TableContainer = new TableContainer(tableSchemaDef,
+                //    new TableDataDefinition(dataTableColumns, tableDataRaws, tableSchemaDef));
+
                 var tableSchemaDef = new TableSchemaDefinition(dataTable.DataSheet.Name, dataTable.DataSheet.lines[0], typesToDataTableColumns);
-                string[] tableDataRaws = dataTable.DataSheet.lines.Skip(1).ToArray();
                 dataTable.TableContainer = new TableContainer(tableSchemaDef,
-                    new TableDataDefinition(dataTableColumns, tableDataRaws, tableSchemaDef));
+                    new TableDataDefinition(dataTable.DataSheet.path, dataTableColumns, tableSchemaDef));
             }
 
             var enumRaws = enumTableEntry.Sheet.lines.Skip(1).ToArray();
@@ -154,19 +159,26 @@ namespace MSgPackBinaryGenerator
 
             // mpc 가 resolver 를 만들때 필요한 .csproj 및 dll 을 생성
             string inputProjectForMpc = CsprojGenerator.GenerateProject(outputDirectory, mpcInputProjectName);
+
             // 여기서 이제 .csproj를 보고 컴파일을해 어셈블리를 생성 
-            // ** 이때 , 중요한거는 .NET SDK 버전 이후로 (이전에는 non-sdk, e.g .Net Framework)
-            // .csproj 를 빌드할때는 .csproj 에 직접 <Compile Include="ItemTable.cs" />.. 이런식으로
-            // 추가하지 않아도 동일 경로 + 하위 경로들에 위치한 모든 .cs 파일을 빌드에 포함시킨다고 함. 
-            // 이런 이유로 위에서 만든 MpcInput.cs 파일을 직접적으로 이 빌드에 연결시키지 않고 그냥 파일을
-            // 동일 디렉터리에 생성한 것 만으로도 빌드에 포함되는 것 . 
+
+            // **
+            //  참고 1. .NET SDK 버전 이후로 (이전에는 non-sdk, e.g .Net Framework)
+            //      .csproj 를 빌드할때는 .csproj 에 직접 <Compile Include="ItemTable.cs" />.. 이런식으로
+            //      추가하지 않아도 동일 경로 + 하위 경로들에 위치한 모든 .cs 파일을 빌드에 포함시킨다고 함. 
+            //      이런 이유로 위에서 만든 MpcInput.cs 파일을 직접적으로 이 빌드에 연결시키지 않고 그냥 파일을
+            //      동일 디렉터리에 생성한 것 만으로도 빌드에 포함되는 것 . 
+
+            //  참고 2. 만약 여기서 Build 에러가 나면 mpc 에 인자로 들어간 소스코드 (MpcInputGenerator 가 생성한 코드) 가
+            //      참조 이슈가 있다거나 하는 경우가 잦음 (e.g MpcInputGenerator 에서 Unity 타입을 사용하려는데 참조를 못하고있거나
+            //      using UnityEngine; 문을 빠뜨렸거나 등..)
             string inputDllForMpc = DotnetBuilder.Build(inputProjectForMpc);
 
             // Resolver 생성 
             string resolverOutput = Path.Combine(outputDirectory, $"{gameDBResolverName}.cs");
 
             // mpc 도 내부적으로 MSBuild 로 빌드를 하기 때문에 
-            // 이 시점 이전에 의도치않은 .cs 파일 생성은 주의해야함 (e.g GameDBContainer.cs)
+            // 이 시점 이전에 의도치않은 .cs 파일 생성은 주의(자동빌드포함)해야함 (e.g GameDBContainer.cs)
             MpcRunner.Run(inputProjectForMpc, resolverOutput);
 
             // Console.WriteLine("-------------------------");
@@ -174,10 +186,16 @@ namespace MSgPackBinaryGenerator
             var resolverSourceCode = File.ReadAllText(resolverOutput);
             Assembly resolverAssembly = null;
 
-            // Resolver 어셈블리 필요. 컴파일해둠.
+            // 실제로 바이너리로 messagePack 내 테이블 데이터들을 Serialize 하려면 
+            // Resolver 가 필요, 즉 내 테이블을 인자로 읽어서 mpc 가 생성한 전용 Resolver 를 어셈블리 필요함. 컴파일해둠.
             resolverAssembly = RuntimeCompiler.CompileSource(
+                "■■■■■■■ Resolver Compile ■■■■■■",
                 resolverSourceCode,
-                new[] { inputDllForMpc });
+                new[] { inputDllForMpc },
+                onError: (msg) =>
+                {
+                    Console.WriteLine(msg);
+                });
 
             var currentDllPath = Assembly.GetExecutingAssembly().Location;
 
@@ -185,7 +203,9 @@ namespace MSgPackBinaryGenerator
             // 즉 이게 무슨 말이냐면 , Resolver 어셈블리를 로드하는 순간 Resolver 가 의존하는 mpcInput 어셈블리도 로드를 한다는 의미.
             // 그렇기에 다음 코드의 additionalReference 에 inputDllForMpc 을 추가하면 
             // 그 안에 중복이 생기기때문에 에러가 발생함.
-            var binaryExporterAssembly = RuntimeCompiler.CompileSource(
+            Assembly binaryExporterAssembly = null;
+            binaryExporterAssembly = RuntimeCompiler.CompileSource(
+                "■■■■■■ Binary Exporter Compile ■■■■■■",
                 binaryGeneratorSourceCode,
                 new string[]
                 {
@@ -195,16 +215,16 @@ namespace MSgPackBinaryGenerator
                     resolverAssembly.Location,
                     // 향후 확장성 고려해서 일단 지금 어셈도 추가
                     currentDllPath
+                }, onError: (msg) =>
+                {
+                    Console.WriteLine(msg);
+
+                    File.WriteAllText(Path.Combine(errorDebugDirectory, $"{gameDBResolverName}.cs"), resolverSourceCode);
+                    File.WriteAllText(Path.Combine(errorDebugDirectory, "GameDBContainer.cs"), dbContainerSourceCode);
+                    File.WriteAllText(Path.Combine(errorDebugDirectory, "GameDBEnums.cs"), enumSourceCode);
+                    File.WriteAllText(Path.Combine(errorDebugDirectory, "BinaryExporter_Artifact.cs"), binaryGeneratorSourceCode);
                 });
 
-            if (binaryExporterAssembly == null)
-            {
-                File.WriteAllText(Path.Combine(errorDebugDirectory, $"{gameDBResolverName}.cs"), resolverSourceCode);
-                File.WriteAllText(Path.Combine(errorDebugDirectory, "GameDBContainer.cs"), dbContainerSourceCode);
-                File.WriteAllText(Path.Combine(errorDebugDirectory, "GameDBEnums.cs"), enumSourceCode);
-                File.WriteAllText(Path.Combine(errorDebugDirectory, "BinaryExporter_Artifact.cs"), binaryGeneratorSourceCode);
-                return 1;
-            }
 
             var assemblyPaths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
@@ -242,11 +262,13 @@ namespace MSgPackBinaryGenerator
                 var gameDBResolverInstance = (IFormatterResolver)gameDBResolverType.GetField("Instance").GetValue(null);
 
                 // 2. 각 리졸버를 LoggingResolver로 감싸서 디버깅 로그를 출력하도록 합니다.
+                var loggingUnityResolver = new LoggingResolver(UnityResolver.Instance, "UnityResolver");
                 var loggingGameDBResolver = new LoggingResolver(gameDBResolverInstance, "GameDBResolver");
                 var loggingStandardResolver = new LoggingResolver(StandardResolver.Instance, "StandardResolver");
 
                 // 3. 로그를 출력하는 리졸버들을 조합합니다.
                 MyCompositeResolver.Instance.Register(
+                    loggingUnityResolver,
                     loggingGameDBResolver,
                     loggingStandardResolver
                 );
