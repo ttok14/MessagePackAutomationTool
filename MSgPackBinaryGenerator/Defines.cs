@@ -168,7 +168,7 @@ namespace MSgPackBinaryGenerator
                     for (int j = 0; j < columns.Length; j++)
                     {
                         var column = columns[j];
-                        string value = csv.GetField(j);
+                        string value = csv.GetField(j).StripQuotes();
 
                         if (schemaLookupTable.TryGetValue(column, out var schema) == false)
                         {

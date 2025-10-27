@@ -131,9 +131,6 @@ namespace MSgPackBinaryGenerator
         public static string ValueStringToCode(string rawTypeName, string value)
         {
             rawTypeName = rawTypeName.NoSpace();
-            // csv 데이터 특성상 배열을 넘기려면 컴마때문에 
-            // 쌍따옴표 사용이 불가피해서 먼저 제거.
-            value = value.StripQuotes();
             string valueSuffix = string.Empty;
             bool isArray = IsArray(rawTypeName);
             var dataType = ToDataType(rawTypeName);
