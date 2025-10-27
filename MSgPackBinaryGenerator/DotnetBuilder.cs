@@ -38,11 +38,34 @@ namespace MSgPackBinaryGenerator
             }
 
             Console.WriteLine("❌ Build failed!");
-           // if (string.IsNullOrEmpty(stderr))
-            //    Console.WriteLine(stdout);
-           // else
-              //  Console.WriteLine(stderr);
-            throw new Exception("dotnet build failed");
+
+            string[] lines = stdout.Split(new[] { Environment.NewLine }, StringSplitOptions.RemoveEmptyEntries);
+
+            Console.WriteLine("--- 추출된 빌드 에러들 (Compilers Errors) ---");
+            bool hasError = false;
+
+            // stdout 가 매우 길기에 (빌드 과정 모든 로그 기록) 
+            // C# 에러관련부분만 최대한 추출
+            foreach (string line in lines)
+            {
+                if (line.Contains("error") && (line.Contains("CS") || line.Contains("MSB")))
+                {
+                    Console.WriteLine(line.Trim());
+                    hasError = true;
+                }
+            }
+
+            if (!hasError)
+            {
+                Console.WriteLine("(■■■■ 전체 stdout (detail log) (■■■■");
+                Console.WriteLine(stdout);
+            }
+            else
+            {
+                Console.WriteLine($"■■■■ 에러 : {stderr}");
+            }
+
+            throw new Exception($"dotnet build failed (■■■■ MpcInput_Artifact 및 각 파일들 확인, 컴파일 에러가 발생하는 코드를 만들어 냈을 확률이 큼 (처리안된 부분이겠지..?) ■■■■)");
         }
     }
 }

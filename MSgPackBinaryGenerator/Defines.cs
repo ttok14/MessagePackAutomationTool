@@ -1,7 +1,13 @@
-﻿using System;
+﻿using CsvHelper;
+using CsvHelper.Configuration;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
+using System.Net.WebSockets;
+using System.Text;
 
 namespace MSgPackBinaryGenerator
 {
@@ -45,7 +51,8 @@ namespace MSgPackBinaryGenerator
 
             if (columnNames.Length != typeNames.Length)
             {
-                throw new ArgumentException($"Failed | Columns And Types Length does not match. \nColumns: {columnNames.Length} Types: {typeNames.Length}");
+                StringBuilder sb = new StringBuilder();
+                throw new ArgumentException($"Failed | Columns And Types Length does not match. \nTableName : {tableName} | Columns: {columns} | Types: {types}");
             }
 
             Fields = new List<TableSchemaDefinitionField>();
@@ -153,16 +160,16 @@ namespace MSgPackBinaryGenerator
             // CsvHelper 구성
             var config = new CsvHelper.Configuration.CsvConfiguration(CultureInfo.InvariantCulture)
             {
-                HasHeaderRecord = true, 
+                HasHeaderRecord = true,
             };
 
             using (var reader = new StreamReader(dataCsvPath))
             using (var csv = new CsvHelper.CsvReader(reader, config))
             {
                 csv.Read();
-                csv.ReadHeader(); 
+                csv.ReadHeader();
 
-                while (csv.Read()) 
+                while (csv.Read())
                 {
                     var newElement = new TableValueElement();
                     for (int j = 0; j < columns.Length; j++)
@@ -182,7 +189,7 @@ namespace MSgPackBinaryGenerator
                         newElement.Records.Add(new TableValueRecord()
                         {
                             SchemaData = schema,
-                            Value = value 
+                            Value = value
                         });
                     }
                     DataList.Add(newElement);
@@ -214,6 +221,8 @@ namespace MSgPackBinaryGenerator
     // 하나의 Enum 요소의 멤버를 정의
     public class EnumMember
     {
+        // !! 테이블과 매칭돼야함 (CSVReader 로 읽음) !! //
+
         public string EnumTypeName { get; set; }
         public bool IsFlags { get; set; }
         public string MemberName { get; set; }
@@ -270,45 +279,38 @@ namespace MSgPackBinaryGenerator
         {
             Enums = new Dictionary<string, EnumDefinition>();
 
-            var columnNames = columns.Split(',');
-            for (int i = 0; i < raws.Length; i++)
+            string csvData = string.Join("\n", raws);
+            var csvConfig = new CsvConfiguration(CultureInfo.InvariantCulture)
             {
-                var rawNames = raws[i].Split(',');
-                if (columnNames.Length != rawNames.Length)
-                {
-                    throw new ArgumentException($"Failed | Columns And Raws Length does not match. \nColumns: {columnNames.Length} Raws: {rawNames.Length}");
-                }
+                HasHeaderRecord = false
+            };
 
-                string enumName = rawNames[0];
-                if (Helper.IsEnumByName(enumName) == false)
-                {
-                    throw new ArgumentException($"Enum Type Must Start with \'E_\' | WrongName : {enumName}");
-                }
+            var columnNames = columns.Split(',');
 
-                bool isFlags = bool.Parse(rawNames[1]);
-                string memberName = rawNames[2];
-                int value = int.Parse(rawNames[3]);
-                string description = rawNames[4];
-
-                if (Enums.TryGetValue(enumName, out var schema) == false)
+            using (var reader = new StringReader(csvData))
+            using (var csv = new CsvReader(reader, csvConfig))
+            {
+                var records = csv.GetRecords<EnumMember>().ToList();
+                foreach (var enumMember in records)
                 {
-                    schema = new EnumDefinition()
+                    if (Helper.IsEnumByName(enumMember.EnumTypeName) == false)
                     {
-                        EnumName = enumName,
-                        IsFlags = isFlags,
-                    };
+                        throw new ArgumentException($"Enum Type Must Start with \'E_\' | WrongName : {enumMember.EnumTypeName}");
+                    }
 
-                    Enums.Add(enumName, schema);
+                    if (Enums.TryGetValue(enumMember.EnumTypeName, out var schema) == false)
+                    {
+                        schema = new EnumDefinition()
+                        {
+                            EnumName = enumMember.EnumTypeName,
+                            IsFlags = enumMember.IsFlags,
+                        };
+
+                        Enums.Add(enumMember.EnumTypeName, schema);
+                    }
+
+                    schema.Members.Add(enumMember);
                 }
-
-                schema.Members.Add(new EnumMember()
-                {
-                    EnumTypeName = enumName,
-                    IsFlags = isFlags,
-                    MemberName = memberName,
-                    Value = value,
-                    Description = description,
-                });
             }
 
             foreach (var e in Enums)

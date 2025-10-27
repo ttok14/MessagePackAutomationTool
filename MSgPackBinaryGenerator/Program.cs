@@ -166,13 +166,23 @@ namespace MSgPackBinaryGenerator
             //  참고 1. .NET SDK 버전 이후로 (이전에는 non-sdk, e.g .Net Framework)
             //      .csproj 를 빌드할때는 .csproj 에 직접 <Compile Include="ItemTable.cs" />.. 이런식으로
             //      추가하지 않아도 동일 경로 + 하위 경로들에 위치한 모든 .cs 파일을 빌드에 포함시킨다고 함. 
-            //      이런 이유로 위에서 만든 MpcInput.cs 파일을 직접적으로 이 빌드에 연결시키지 않고 그냥 파일을
+            //      이런 이유로 ■■ 위에서 만든 MpcInput.cs 파일 ■■ 을 직접적으로 이 빌드에 연결시키지 않고 그냥 파일을
             //      동일 디렉터리에 생성한 것 만으로도 빌드에 포함되는 것 . 
 
             //  참고 2. 만약 여기서 Build 에러가 나면 mpc 에 인자로 들어간 소스코드 (MpcInputGenerator 가 생성한 코드) 가
             //      참조 이슈가 있다거나 하는 경우가 잦음 (e.g MpcInputGenerator 에서 Unity 타입을 사용하려는데 참조를 못하고있거나
             //      using UnityEngine; 문을 빠뜨렸거나 등..)
-            string inputDllForMpc = DotnetBuilder.Build(inputProjectForMpc);
+
+            string inputDllForMpc = string.Empty;
+            try
+            {
+                inputDllForMpc = DotnetBuilder.Build(inputProjectForMpc);
+            }
+            catch (Exception exp)
+            {
+                Console.WriteLine($"■■■■ 여기서 에러가 났다면, mpc 가 MpcInput 코드를 읽다가 컴파일 에러났을 확률이 높음 (잘못된 테이블 데이터 등으로 인해) 먼저, 생성된 MpcInput_Artifact.cs 파일을 확인 및 오류문을 잘 보고 테이블 데이터 등 재점검 바람 ■■■■ Exception : {exp.Message}");
+                return 1;
+            }
 
             // Resolver 생성 
             string resolverOutput = Path.Combine(outputDirectory, $"{gameDBResolverName}.cs");
@@ -185,6 +195,7 @@ namespace MSgPackBinaryGenerator
 
             var resolverSourceCode = File.ReadAllText(resolverOutput);
             Assembly resolverAssembly = null;
+            bool err = false;
 
             // 실제로 바이너리로 messagePack 내 테이블 데이터들을 Serialize 하려면 
             // Resolver 가 필요, 즉 내 테이블을 인자로 읽어서 mpc 가 생성한 전용 Resolver 를 어셈블리 필요함. 컴파일해둠.
@@ -195,7 +206,16 @@ namespace MSgPackBinaryGenerator
                 onError: (msg) =>
                 {
                     Console.WriteLine(msg);
+                    err = true;
                 });
+
+            if (err)
+            {
+                File.WriteAllText(Path.Combine(errorDebugDirectory, $"{gameDBResolverName}.cs"), resolverSourceCode);
+                File.WriteAllText(Path.Combine(errorDebugDirectory, "GameDBContainer.cs"), dbContainerSourceCode);
+                File.WriteAllText(Path.Combine(errorDebugDirectory, "GameDBEnums.cs"), enumSourceCode);
+                return 1;
+            }
 
             var currentDllPath = Assembly.GetExecutingAssembly().Location;
 
@@ -218,13 +238,17 @@ namespace MSgPackBinaryGenerator
                 }, onError: (msg) =>
                 {
                     Console.WriteLine(msg);
-
-                    File.WriteAllText(Path.Combine(errorDebugDirectory, $"{gameDBResolverName}.cs"), resolverSourceCode);
-                    File.WriteAllText(Path.Combine(errorDebugDirectory, "GameDBContainer.cs"), dbContainerSourceCode);
-                    File.WriteAllText(Path.Combine(errorDebugDirectory, "GameDBEnums.cs"), enumSourceCode);
-                    File.WriteAllText(Path.Combine(errorDebugDirectory, "BinaryExporter_Artifact.cs"), binaryGeneratorSourceCode);
+                    err = true;
                 });
 
+            if (err)
+            {
+                File.WriteAllText(Path.Combine(errorDebugDirectory, $"{gameDBResolverName}.cs"), resolverSourceCode);
+                File.WriteAllText(Path.Combine(errorDebugDirectory, "GameDBContainer.cs"), dbContainerSourceCode);
+                File.WriteAllText(Path.Combine(errorDebugDirectory, "GameDBEnums.cs"), enumSourceCode);
+                File.WriteAllText(Path.Combine(errorDebugDirectory, "BinaryExporter_Artifact.cs"), binaryGeneratorSourceCode);
+                return 1;
+            }
 
             var assemblyPaths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
