@@ -48,7 +48,17 @@ namespace MSgPackBinaryGenerator
                                         bool isID = i == 0;
                                         var record = element.Records[i];
                                         bool isArray = record.SchemaData.IsArray;
-                                        string value = Helper.ValueStringToCode(record.SchemaData.TypeName, record.Value);
+                                        string value = Helper.ValueStringToCode(record.SchemaData.TypeName, record.Value,
+                                            isEnumFlagChecker:
+                                            (rawTypeName) =>
+                                            {
+                                                if (enumGroup.Enums.ContainsKey(rawTypeName) == false)
+                                                {
+                                                    Console.WriteLine($"Given rawTypeName does not exist in enum group : {rawTypeName}");
+                                                    return false;
+                                                }
+                                                return enumGroup.Enums[rawTypeName].IsFlags;
+                                            });
 
                                         if (isArray)
                                         {

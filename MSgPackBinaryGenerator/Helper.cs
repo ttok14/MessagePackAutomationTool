@@ -2,6 +2,7 @@
 using Microsoft.CodeAnalysis.CSharp;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -128,7 +129,7 @@ namespace MSgPackBinaryGenerator
             return DataRecordDataType.Etc;
         }
 
-        public static string ValueStringToCode(string rawTypeName, string value)
+        public static string ValueStringToCode(string rawTypeName, string value, Func<string, bool> isEnumFlagChecker)
         {
             rawTypeName = rawTypeName.NoSpace();
             string valueSuffix = string.Empty;
@@ -224,15 +225,43 @@ namespace MSgPackBinaryGenerator
             }
             else if (dataType == DataRecordDataType.Enum)
             {
-                if (isArray)
+                // **주의 **
+                // 배열은 rawTypeName 에 "Enum_타입_이름[]" 이런식으로 전달중이니
+                // 멤버 이름 앞에 추가해줘야 하는 Enum 의 특성상
+                // 이 부분을 제거 처리한 부분을 별도로 보관.
+                var enumTypeName = rawTypeName.StripAllBrackets();
+
+                // Enum 타입일때 플래그일때와 일반 Enum 타입에 따라 다르게 처리 필요
+                if (isEnumFlagChecker(enumTypeName))
                 {
-                    value = string.Join(',',
-                        value.GetElementsFromArrayInSingleLine(false).Split(',').
-                        Select(e => $"{rawTypeName}.{e}"));
+                    if (isArray)
+                    {
+                        // 가독성 너무 거지같아서 조금이라도 나눔 ..
+                        // 1. value : "Member01|Member02|Member03,Member01|Member03"
+                        //  [0] : "Member01|Member02|Member03"
+                        //  [1] : "Member01|Member03"
+                        var step01 = value.GetElementsFromArrayInSingleLine(false).Split(',');
+                        // 2. "E_Enum.Member01|E_Enum.Member02|E_Enum.Member03,E_Enum.Member01|E_Enum.Member03" 으로 조합 
+                        value = string.Join(',', step01.Select(e => string.Join('|', e.Split('|').Select(t02 => $"{enumTypeName}.{t02}"))));
+                    }
+                    else
+                    {
+                        string combined = string.Join('|', value.Split('|').Select(memberName => $"{enumTypeName}.{memberName}"));
+                        value = combined;
+                    }
                 }
                 else
                 {
-                    value = $"{rawTypeName}.{value}";
+                    if (isArray)
+                    {
+                        value = string.Join(',',
+                            value.GetElementsFromArrayInSingleLine(false).Split(',').
+                            Select(e => $"{enumTypeName}.{e}"));
+                    }
+                    else
+                    {
+                        value = $"{enumTypeName}.{value}";
+                    }
                 }
             }
             else if (dataType == DataRecordDataType.String)

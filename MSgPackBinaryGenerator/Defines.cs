@@ -161,6 +161,7 @@ namespace MSgPackBinaryGenerator
             var config = new CsvHelper.Configuration.CsvConfiguration(CultureInfo.InvariantCulture)
             {
                 HasHeaderRecord = true,
+                TrimOptions = TrimOptions.Trim
             };
 
             using (var reader = new StreamReader(dataCsvPath))
@@ -282,7 +283,8 @@ namespace MSgPackBinaryGenerator
             string csvData = string.Join("\n", raws);
             var csvConfig = new CsvConfiguration(CultureInfo.InvariantCulture)
             {
-                HasHeaderRecord = false
+                HasHeaderRecord = false,
+                TrimOptions = TrimOptions.Trim
             };
 
             var columnNames = columns.Split(',');
