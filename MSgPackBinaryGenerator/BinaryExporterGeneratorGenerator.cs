@@ -48,22 +48,32 @@ namespace MSgPackBinaryGenerator
                                         bool isID = i == 0;
                                         var record = element.Records[i];
                                         bool isArray = record.SchemaData.IsArray;
-                                        string value = Helper.ValueStringToCode(record.SchemaData.TypeName, record.Value,
-                                            isEnumFlagChecker:
-                                            (rawTypeName) =>
-                                            {
-                                                if (enumGroup.Enums.ContainsKey(rawTypeName) == false)
-                                                {
-                                                    Console.WriteLine($"Given rawTypeName does not exist in enum group : {rawTypeName}");
-                                                    return false;
-                                                }
-                                                return enumGroup.Enums[rawTypeName].IsFlags;
-                                            });
+                                        bool isValueEmpty = string.IsNullOrEmpty(record.Value);
+                                        string value = null;
 
-                                        if (isArray)
+                                        if (isValueEmpty)
                                         {
-                                            // e.g new Int[] { 1,2,3 
-                                            value = $"new {record.SchemaData.TypeName} {{ " + value + $"}}";
+                                            value = $"default({record.SchemaData.TypeName})";
+                                        }
+                                        else
+                                        {
+                                            value = Helper.ValueStringToCode(record.SchemaData.TypeName, record.Value,
+                                                isEnumFlagChecker:
+                                                (rawTypeName) =>
+                                                {
+                                                    if (enumGroup.Enums.ContainsKey(rawTypeName) == false)
+                                                    {
+                                                        Console.WriteLine($"Given rawTypeName does not exist in enum group : {rawTypeName}");
+                                                        return false;
+                                                    }
+                                                    return enumGroup.Enums[rawTypeName].IsFlags;
+                                                });
+
+                                            if (isArray)
+                                            {
+                                                // e.g new Int[] { 1,2,3 
+                                                value = $"new {record.SchemaData.TypeName} {{ " + value + $"}}";
+                                            }
                                         }
 
                                         if (isID)

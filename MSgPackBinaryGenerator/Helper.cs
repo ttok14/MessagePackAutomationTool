@@ -270,7 +270,7 @@ namespace MSgPackBinaryGenerator
                 {
                     value = string.Join(',',
                         value.GetElementsFromArrayInSingleLine(false).Split(',').
-                        Select(e => $"\"{value}\""));
+                        Select(e => $"\"{e}\""));
                 }
                 else
                 {

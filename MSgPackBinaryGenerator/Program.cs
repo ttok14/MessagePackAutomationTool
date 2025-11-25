@@ -181,7 +181,7 @@ namespace MSgPackBinaryGenerator
             catch (Exception exp)
             {
                 Console.WriteLine($"■■■■ 여기서 에러가 났다면, mpc 가 MpcInput 코드를 읽다가 컴파일 에러났을 확률이 높음 (잘못된 테이블 데이터 등으로 인해) 먼저, 생성된 MpcInput_Artifact.cs 파일을 확인 및 오류문을 잘 보고 테이블 데이터 등 재점검 바람 ■■■■ Exception : {exp.Message}");
-                return 1;
+                return 2;
             }
 
             // Resolver 생성 
@@ -214,7 +214,7 @@ namespace MSgPackBinaryGenerator
                 File.WriteAllText(Path.Combine(errorDebugDirectory, $"{gameDBResolverName}.cs"), resolverSourceCode);
                 File.WriteAllText(Path.Combine(errorDebugDirectory, "GameDBContainer.cs"), dbContainerSourceCode);
                 File.WriteAllText(Path.Combine(errorDebugDirectory, "GameDBEnums.cs"), enumSourceCode);
-                return 1;
+                return 3;
             }
 
             var currentDllPath = Assembly.GetExecutingAssembly().Location;
@@ -247,7 +247,7 @@ namespace MSgPackBinaryGenerator
                 File.WriteAllText(Path.Combine(errorDebugDirectory, "GameDBContainer.cs"), dbContainerSourceCode);
                 File.WriteAllText(Path.Combine(errorDebugDirectory, "GameDBEnums.cs"), enumSourceCode);
                 File.WriteAllText(Path.Combine(errorDebugDirectory, "BinaryExporter_Artifact.cs"), binaryGeneratorSourceCode);
-                return 1;
+                return 4;
             }
 
             var assemblyPaths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -276,7 +276,7 @@ namespace MSgPackBinaryGenerator
             if (type == null)
             {
                 Console.WriteLine("❌ TableBinaryExporter 타입을 찾을 수 없습니다.");
-                return 1;
+                return 5;
             }
 
             try
@@ -309,7 +309,7 @@ namespace MSgPackBinaryGenerator
                     if (method == null)
                     {
                         Console.WriteLine($"❌ Export{container.SchemaData.TableName} 메서드를 찾을 수 없습니다.");
-                        return 1;
+                        return 6;
                     }
                     else
                     {
