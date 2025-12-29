@@ -40,6 +40,8 @@ namespace MSgPackBinaryGenerator
         Double,
         // 유니티 Vector2Int 타입
         Vector2Int,
+        // 유니티 Vector3 타입
+        Vector3,
         // 불리언
         Boolean,
         // 문자열 (" ")

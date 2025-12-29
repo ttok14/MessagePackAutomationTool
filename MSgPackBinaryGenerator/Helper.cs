@@ -124,6 +124,10 @@ namespace MSgPackBinaryGenerator
             {
                 return DataRecordDataType.Vector2Int;
             }
+            else if (dataType.Equals("Vector3", StringComparison.OrdinalIgnoreCase))
+            {
+                return DataRecordDataType.Vector3;
+            }
 
             Console.WriteLine($"** 데이터 타입이 기존에 정의한 데이터 타입을 벗어난다 !! : {dataType}");
             return DataRecordDataType.Etc;
@@ -221,6 +225,35 @@ namespace MSgPackBinaryGenerator
                 {
                     // 문자 그대로 넣어주면 됨 (e.g 0.5)
                     value = $"new Vector2Int({value.StripAllBrackets()})";
+                }
+            }
+            else if (dataType == DataRecordDataType.Vector3)
+            {
+                if (isArray)
+                {
+                    var elements = value.ExtractDataElementsFromArray(true);
+                    value = string.Join(',', elements.Select(e =>
+                    {
+                        var pos = e.Split(',');
+                        return $"new Vector3({pos[0]}f,{pos[1]}f,{pos[2]}f)";
+                    }));
+                }
+                else
+                {
+                    var str = value.StripAllBrackets();
+
+                    var elements = str.Split(',');
+
+                    for (int i = 0; i < elements.Length; i++)
+                    {
+                        if (elements[i].Contains('.'))
+                        {
+                            elements[i] += "f";
+                        }
+                    }
+
+                    // 문자 그대로 넣어주면 됨
+                    value = $"new Vector3({string.Join(',', elements)})";
                 }
             }
             else if (dataType == DataRecordDataType.Enum)
