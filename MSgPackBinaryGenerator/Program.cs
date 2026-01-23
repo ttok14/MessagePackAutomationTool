@@ -59,7 +59,7 @@ namespace MSgPackBinaryGenerator
             inputDirectory = Helper.ExtractCommandArgument(args, "-i");
             if (string.IsNullOrEmpty(inputDirectory))
             {
-                Console.WriteLine($"사용법 : Program.exe -i [InputDirectory] -o [OutputDirectory]");
+                Console.WriteLine($"사용법 : Program.exe -i [InputDirectory] -o [OutputDirectory] -p [Platform]");
                 Console.WriteLine($"[InputDirectory]: 테이블/Enum 의 csv 포맷 파일들을 찾을 디렉터리");
                 Console.WriteLine($"[OutputDirectory] : 메시지팩 결과물 생성 디렉터리");
                 return 1;
@@ -73,6 +73,26 @@ namespace MSgPackBinaryGenerator
                 outputDirectory = Path.Combine(Directory.GetCurrentDirectory(), $"Result_{timestamp}");
                 Console.WriteLine($"결과 파일 생성 디렉토리 자동 설정\n{outputDirectory}");
             }
+
+            string strPlatform = Helper.ExtractCommandArgument(args, "-p");
+            if (string.IsNullOrEmpty(strPlatform))
+            {
+                Console.WriteLine($"플랫폼 자동 설정 -> Unity");
+                Global.CurrentPlatform = Platform.Unity;
+            }
+            else
+            {
+                if (Enum.TryParse(strPlatform, out Global.CurrentPlatform) == false)
+                {
+                    Console.WriteLine($"주어진 플랫폼이 유효하지 않습니다. ({strPlatform})");
+                    Console.WriteLine("사용 가능 플랫폼 리스트 : " + string.Join(",", Enum.GetValues(typeof(Platform)).Cast<Platform>()));
+                    return 55;
+                }
+            }
+
+            Console.WriteLine($"입력 데이터 경로 : {inputDirectory}");
+            Console.WriteLine($"출력 데이터 경로 : {outputDirectory}");
+            Console.WriteLine($"플랫폼 : {Global.CurrentPlatform}");
 
             List<DataTable> dataTableEntries = Directory.GetFiles(inputDirectory).
                 Where(t => t.EndsWith("EnumTable.csv") == false && t.EndsWith("_Schema.csv") == false).

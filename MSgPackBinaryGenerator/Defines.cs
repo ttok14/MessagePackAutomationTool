@@ -96,7 +96,11 @@ namespace MSgPackBinaryGenerator
                         CodeStringBuilder toInsert = new CodeStringBuilder(512, 1);
 
                         toInsert.AppendLine();
-                        toInsert.AppendLine("[UnityEngine.Scripting.Preserve]");
+
+                        // 이 줄은 유니티에서 stripping 막기 위함이니 조건 추가
+                        if (Global.CurrentPlatform == Platform.Unity)
+                            toInsert.AppendLine("[UnityEngine.Scripting.Preserve]");
+
                         toInsert.AppendLine($"public static Dictionary<{IDType}, {TableName}> Deserialize(ref byte[] _readBytes)");
                         toInsert.OpenBracket();
                         {

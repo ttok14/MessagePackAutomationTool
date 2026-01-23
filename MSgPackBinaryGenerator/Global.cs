@@ -4,8 +4,16 @@ using System.Text;
 
 namespace MSgPackBinaryGenerator
 {
+    public enum Platform
+    {
+        Unity = 0,
+        Native,
+    }
+
     public static class Global
     {
+        public static Platform CurrentPlatform = Platform.Unity;
+
         public static Dictionary<string, List<TableSchemaDefinition>> TableSchemaByTableName { get; set; }
         public static Dictionary<string, List<EnumGroups>> EnumSchemaByEnumName { get; set; }
         public static string GameDBContainerSourceCode { get; set; }
