@@ -90,6 +90,8 @@ namespace MSgPackBinaryGenerator
                 }
             }
 
+            SetupConfig();
+
             Console.WriteLine($"입력 데이터 경로 : {inputDirectory}");
             Console.WriteLine($"출력 데이터 경로 : {outputDirectory}");
             Console.WriteLine($"플랫폼 : {Global.CurrentPlatform}");
@@ -153,6 +155,42 @@ namespace MSgPackBinaryGenerator
                 enumSourceCode: enumSourceCode,
                 binaryGeneratorSourceCode: binaryGeneratorSourceCode);
         }
+
+        static void SetupConfig()
+        {
+            // 어셈블리 위치에 Config.txt 파일 위치시킴됨
+            string configFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Config.txt");
+
+            if (File.Exists(configFilePath) == false)
+                return;
+
+            Console.WriteLine($"■■■■ Config 파일 로드합니다. ■■■");
+
+            string[] configLines = File.ReadAllLines(configFilePath);
+
+            for (int i = 0; i < configLines.Length; i++)
+            {
+                var split = configLines[i].Split('=');
+                if (split.Length != 2)
+                {
+                    Console.WriteLine($"Config 유효하지 않은 라인 검출(Key=Value 형식이어야 합니다) : {configLines[i]}");
+                    continue;
+                }
+
+                var key = split[0];
+                // 앞뒤에 붙은 스페이스와 따옴표만 삭제
+                var value = split[1].Trim().Trim('"');
+
+                // 파싱 
+                if (key == DeploymentInfo.COMPONENT_DEPLOYMENT_COPY_PATH_KEY)
+                    Global.Config.ComponentsDeploymentCopyPath = value;
+                else if (key == DeploymentInfo.BINARY_DEPLOYMENT_COPY_PATH_KEY)
+                    Global.Config.BinariesDeploymentCopyPath = value;
+                else if (key == DeploymentInfo.METADATA_COPY_PATH_KEY)
+                    Global.Config.MetadataDeploymentCopyPath = value;
+            }
+        }
+
         static int StartPipeline(
             string outputDirectory,
             TableContainer[] dataTableContainers,
@@ -299,6 +337,9 @@ namespace MSgPackBinaryGenerator
                 return 5;
             }
 
+            string binaryOutputDirectory = "";
+            string metadataPath = "";
+
             try
             {
                 // 1. GameDBResolver.Instance를 리플렉션으로 가져옵니다.
@@ -320,7 +361,7 @@ namespace MSgPackBinaryGenerator
                 // 4. 이 리졸버를 포함하는 새로운 옵션 객체를 만듭니다.
                 var options = MessagePackSerializerOptions.Standard.WithResolver(MyCompositeResolver.Instance);
                 MessagePackSerializer.DefaultOptions = options;
-                string binaryOutputDirectory = Path.Combine(outputDirectory, "binaries");
+                binaryOutputDirectory = Path.Combine(outputDirectory, "binaries");
                 Directory.CreateDirectory(binaryOutputDirectory);
 
                 foreach (var container in dataTableContainers)
@@ -347,10 +388,10 @@ namespace MSgPackBinaryGenerator
                 // 메타데이터 생성하기
                 var metadata = new MetadataGenerator().Generate(binaryOutputDirectory);
                 var jsonOptions = new JsonSerializerOptions() { WriteIndented = true };
-                var jsonString = JsonSerializer.Serialize(metadata, jsonOptions);
-                var jsonOutputDirectory = Path.Combine(outputDirectory, "table_metadata.json");
-                File.WriteAllText(jsonOutputDirectory, jsonString);
-                Console.WriteLine($"Metadata (JSON) 저장 완료 : {jsonOutputDirectory}");
+                var metadataJson = JsonSerializer.Serialize(metadata, jsonOptions);
+                metadataPath = Path.Combine(outputDirectory, "table_metadata.json");
+                File.WriteAllText(metadataPath, metadataJson);
+                Console.WriteLine($"Metadata (JSON) 저장 완료 : {metadataPath}");
                 Console.WriteLine();
             }
             finally
@@ -358,14 +399,14 @@ namespace MSgPackBinaryGenerator
                 AppDomain.CurrentDomain.AssemblyResolve -= assemblyResolver;
             }
 
-            string directoryForImportants = "components";
+            string mainComponentsDirectory = Path.Combine(outputDirectory, "components");
 
-            Directory.CreateDirectory(Path.Combine(outputDirectory, directoryForImportants));
+            Directory.CreateDirectory(mainComponentsDirectory);
 
             #region ===:: Binary 생성에 필요하지 않은 아티팩트 파일 생성 (의도치 않은 빌드에 포함 방지)::===
-            File.Move(resolverOutput, Path.Combine(outputDirectory, directoryForImportants, $"{gameDBResolverName}.cs"));
-            File.WriteAllText(Path.Combine(outputDirectory, directoryForImportants, "GameDBContainer.cs"), dbContainerSourceCode);
-            File.WriteAllText(Path.Combine(outputDirectory, directoryForImportants, "GameDBEnums.cs"), enumSourceCode);
+            File.Move(resolverOutput, Path.Combine(mainComponentsDirectory, $"{gameDBResolverName}.cs"));
+            File.WriteAllText(Path.Combine(mainComponentsDirectory, "GameDBContainer.cs"), dbContainerSourceCode);
+            File.WriteAllText(Path.Combine(mainComponentsDirectory, "GameDBEnums.cs"), enumSourceCode);
             File.WriteAllText(Path.Combine(outputDirectory, "BinaryExporter_Artifact.cs"), binaryGeneratorSourceCode);
             #endregion
 
@@ -374,7 +415,109 @@ namespace MSgPackBinaryGenerator
                 Console.WriteLine($"최종 파일들 : {file}");
             }
 
+            RunDeployments(outputDirectory, mainComponentsDirectory, binaryOutputDirectory, metadataPath);
+
             return 0;
+        }
+
+        private static void RunDeployments(string outputDirectory, string mainComponentsDirectory, string binaryOutputDirectory, string metadataPath)
+        {
+            if (string.IsNullOrEmpty(Global.Config.ComponentsDeploymentCopyPath) &&
+                string.IsNullOrEmpty(Global.Config.MetadataDeploymentCopyPath) &&
+                string.IsNullOrEmpty(Global.Config.BinariesDeploymentCopyPath))
+            {
+                return;
+            }
+
+            Console.WriteLine($"■■■■ 최종 자동 배포를 시도합니다. ■■■");
+
+            if (string.IsNullOrEmpty(Global.Config.ComponentsDeploymentCopyPath) == false)
+                Deploy(mainComponentsDirectory,
+                    Global.Config.ComponentsDeploymentCopyPath,
+                    ".cs",
+                    DeploymentInfo.COMPONENT_DEPLOYMENT_COPY_PATH_KEY,
+                    isFile: false);
+
+            if (string.IsNullOrEmpty(Global.Config.BinariesDeploymentCopyPath) == false)
+                Deploy(binaryOutputDirectory,
+                    Global.Config.BinariesDeploymentCopyPath,
+                    $".{Constants.BinaryOutputExtension}",
+                    DeploymentInfo.BINARY_DEPLOYMENT_COPY_PATH_KEY,
+                    isFile: false);
+
+            if (string.IsNullOrEmpty(Global.Config.MetadataDeploymentCopyPath) == false)
+                Deploy(metadataPath,
+                    Global.Config.MetadataDeploymentCopyPath,
+                    ".json",
+                    DeploymentInfo.METADATA_COPY_PATH_KEY,
+                    isFile: true);
+        }
+
+        private static void Deploy(string srcPath, string dstDir, string extension, string debugKeyInfo, bool isFile)
+        {
+            Console.WriteLine($"배포 시도중 | 원본 패스 : {srcPath}, 대상 패스 : {dstDir}, 파일 or 폴더 : {isFile}");
+
+            // 배포 타겟 위치에 이미 해당 확장자의 파일들은
+            // Old Version 으로 간주하고 삭제 (안정성 문제로 최상위 디렉터리의
+            // 바로 아래만 삭제)
+            if (Directory.Exists(dstDir))
+            {
+                foreach (var existingPath in Directory.GetFiles(dstDir, "*", SearchOption.TopDirectoryOnly))
+                {
+                    if (Path.GetExtension(existingPath).ToLower() == extension.ToLower())
+                        File.Delete(existingPath);
+                }
+            }
+
+            if (isFile)
+            {
+                if (File.Exists(srcPath) == false)
+                {
+                    Console.WriteLine($"배포 실패 (Key정보 : {debugKeyInfo}), 원본 패스가 유효하지 않음 | SrcPath : {srcPath}");
+                    return;
+                }
+
+                if (Directory.Exists(dstDir) == false)
+                    Directory.CreateDirectory(dstDir);
+
+                try
+                {
+                    File.Copy(srcPath, Path.Combine(dstDir, Path.GetFileName(srcPath)), overwrite: true);
+                }
+                catch (Exception exp)
+                {
+                    Console.WriteLine($"파일 배포작업 실패 | 예외 : {exp.ToString()}");
+                }
+            }
+            else
+            {
+                if (Directory.Exists(srcPath) == false)
+                {
+                    Console.WriteLine($"배포 실패 (Key정보 : {debugKeyInfo}), 원본 패스가 유효하지 않음 | SrcPath : {srcPath}");
+                    return;
+                }
+
+                if (Directory.Exists(dstDir) == false)
+                    Directory.CreateDirectory(dstDir);
+
+                foreach (var subDir in Directory.GetDirectories(srcPath, "*", SearchOption.AllDirectories))
+                {
+                    Directory.CreateDirectory(subDir.Replace(srcPath, dstDir));
+                }
+
+                try
+                {
+                    // 카피 대상에서 파일 경로들을(하위 폴더가 존재한다면 모두 포함)을 모두 순회
+                    foreach (var path in Directory.GetFiles(srcPath, "*", SearchOption.AllDirectories))
+                    {
+                        File.Copy(path, path.Replace(srcPath, dstDir), overwrite: true);
+                    }
+                }
+                catch (Exception exp)
+                {
+                    Console.WriteLine($"작업 실패 (File 배포중) | 예외 : {exp.ToString()}");
+                }
+            }
         }
     }
 }
